@@ -39,6 +39,12 @@ def process_item(id, directory):
 
     elif '/folders/' in url:
         process_folder(id, directory, html=html)
+    elif 'ServiceLogin' in url:
+        sys.stderr.write('Id {} does not have link sharing enabled'.format(id))
+        sys.exit(1)
+    else:
+        sys.stderr.write('That id {} returned an unknown url'.format(id))
+        sys.exit(1)
 
 def process_folder(id, directory, html=None):    
     if not html:
