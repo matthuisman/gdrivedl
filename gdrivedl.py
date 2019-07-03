@@ -3,7 +3,7 @@ import re
 import json
 import os
 
-import urllib.request
+from urllib.request import Request, urlopen
 
 ITEM_URL        = 'https://drive.google.com/open?id={id}'
 FILE_URL        = 'https://docs.google.com/uc?export=download&id={id}&confirm={confirm}'
@@ -21,12 +21,12 @@ CONFIRM_PATTERN = re.compile("download_warning[0-9A-Za-z_-]+=([0-9A-Za-z_-]+);",
 def process_item(id, directory):
     url = ITEM_URL.format(id=id)
     
-    r    = urllib.request.urlopen(url)
-    url  = r.geturl()
-    text = r.read().decode('utf-8')
+    resp = urlopen(url)
+    url  = resp.geturl()
+    html = resp.read().decode('utf-8')
 
     if '/file/' in url:
-        match = FILE_PATTERN.search(text)
+        match = FILE_PATTERN.search(html)
         data  = match.group(1).replace('\/', '/').rstrip('}').strip()
         data  = data.encode().decode('unicode_escape')
         data  = json.loads(data)
@@ -38,12 +38,12 @@ def process_item(id, directory):
         process_file(id, file_path, file_size)
 
     elif '/folders/' in url:
-        process_folder(id, directory, html=text)
+        process_folder(id, directory, html=html)
 
 def process_folder(id, directory, html=None):    
     if not html:
         url  = FOLDER_URL.format(id=id)
-        html = urllib.request.urlopen(url).read().decode('utf-8')
+        html = urlopen(url).read().decode('utf-8')
 
     match = FOLDER_PATTERN.search(html)
     data = match.group(1).replace('\/', '/')
@@ -73,9 +73,9 @@ def process_folder(id, directory, html=None):
 def process_file(id, file_path, file_size, confirm='', cookies=''):
     url = FILE_URL.format(id=id, confirm=confirm)
 
-    req      = urllib.request.Request(url, headers={'Cookie': cookies})
-    response = urllib.request.urlopen(req)
-    cookies  = response.headers.get('Set-Cookie') or ''
+    req     = Request(url, headers={'Cookie': cookies})
+    resp    = urlopen(req)
+    cookies = resp.headers.get('Set-Cookie') or ''
 
     if not confirm and 'download_warning' in cookies:
         confirm = CONFIRM_PATTERN.search(cookies)
@@ -86,7 +86,7 @@ def process_file(id, file_path, file_size, confirm='', cookies=''):
     try:
         with open(file_path, 'wb') as f:
             dl = 0
-            for chunk in iter(lambda: response.read(4096), ''):
+            for chunk in iter(lambda: resp.read(4096), ''):
                 if not chunk:
                     break
 
