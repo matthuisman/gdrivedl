@@ -1,8 +1,9 @@
 import sys
-import requests
 import re
 import json
 import os
+
+import urllib.request
 
 ITEM_URL        = 'https://drive.google.com/open?id={id}'
 FILE_URL        = 'https://docs.google.com/uc?export=download&id={id}&confirm={confirm}'
@@ -15,19 +16,17 @@ ID_PATTERNS     = [
 ]
 FILE_PATTERN    = re.compile("itemJson: (\[.*?);</script>", re.DOTALL|re.IGNORECASE)
 FOLDER_PATTERN  = re.compile("window\['_DRIVE_ivd'\] = '(.*?)';", re.DOTALL|re.IGNORECASE)
-CONFIRM_PATTERN = re.compile("confirm=([0-9A-Za-z_-]+)", re.IGNORECASE)
-SESSION         = requests.session()
+CONFIRM_PATTERN = re.compile("download_warning[0-9A-Za-z_-]+=([0-9A-Za-z_-]+);", re.IGNORECASE)
 
 def process_item(id, directory):
     url = ITEM_URL.format(id=id)
-    r   = SESSION.get(url)
+    
+    r    = urllib.request.urlopen(url)
+    url  = r.geturl()
+    text = r.read().decode('utf-8')
 
-    if r.status_code != 200:
-        sys.stderr.write('The item {} was not found'.format(id))
-        sys.exit(1)
-
-    if '/file/' in r.url:
-        match = FILE_PATTERN.search(r.text)
+    if '/file/' in url:
+        match = FILE_PATTERN.search(text)
         data  = match.group(1).replace('\/', '/').rstrip('}').strip()
         data  = data.encode().decode('unicode_escape')
         data  = json.loads(data)
@@ -38,14 +37,13 @@ def process_item(id, directory):
 
         process_file(id, file_path, file_size)
 
-    elif '/folders/' in r.url:
-        process_folder(id, directory, html=r.text)
+    elif '/folders/' in url:
+        process_folder(id, directory, html=text)
 
 def process_folder(id, directory, html=None):    
     if not html:
-        print('fetch')
         url  = FOLDER_URL.format(id=id)
-        html = SESSION.get(url).text
+        html = urllib.request.urlopen(url).read().decode('utf-8')
 
     match = FOLDER_PATTERN.search(html)
     data = match.group(1).replace('\/', '/')
@@ -72,24 +70,28 @@ def process_folder(id, directory, html=None):
             process_file(item_id, item_path, int(item_size))
             sys.stdout.write('\n')
 
-def process_file(id, file_path, file_size, confirm=''):
+def process_file(id, file_path, file_size, confirm='', cookies=''):
     url = FILE_URL.format(id=id, confirm=confirm)
 
-    r = SESSION.get(url, stream=True)
-    if not confirm and r.cookies:
-        confirm = CONFIRM_PATTERN.search(r.text)
-        return process_file(id, file_path, file_size, confirm.group(1))
+    req      = urllib.request.Request(url, headers={'Cookie': cookies})
+    response = urllib.request.urlopen(req)
+    cookies  = response.headers.get('Set-Cookie') or ''
 
-    r.raise_for_status()
+    if not confirm and 'download_warning' in cookies:
+        confirm = CONFIRM_PATTERN.search(cookies)
+        return process_file(id, file_path, file_size, confirm.group(1), cookies)
 
     sys.stdout.write(file_path+'\n')
 
     try:
         with open(file_path, 'wb') as f:
             dl = 0
-            for data in r.iter_content(chunk_size=4096):
-                dl += len(data)
-                f.write(data)
+            for chunk in iter(lambda: response.read(4096), ''):
+                if not chunk:
+                    break
+
+                dl += len(chunk)
+                f.write(chunk)
                 done = int(50 * dl / file_size)
                 sys.stdout.write("\r[{}{}] {:.2f}MB/{:.2f}MB".format('=' * done, ' ' * (50-done), dl/1024/1024, file_size/1024/1024))
                 sys.stdout.flush()
