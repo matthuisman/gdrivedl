@@ -78,7 +78,7 @@ def process_folder(id, directory, html=None):
 
 def process_file(id, file_path, file_size, confirm='', cookies=''):
     if os.path.exists(file_path):
-        sys.stdout.write('File Exists. Skipping')
+        sys.stdout.write(file_path+'\nFile Exists. Skipping')
         return
 
     url     = FILE_URL.format(id=id, confirm=confirm)
