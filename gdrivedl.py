@@ -47,6 +47,8 @@ def process_item(id, directory):
         sys.exit(1)
 
 def process_folder(id, directory, html=None):    
+    sys.stdout.write(directory+'\n')
+
     if not html:
         url  = FOLDER_URL.format(id=id)
         html = urlopen(url).read().decode('utf-8')
@@ -57,10 +59,11 @@ def process_folder(id, directory, html=None):
     data = json.loads(data)
 
     if not data[0]:
-        #empty folder
+        sys.stdout.write('Empty Directory. Skipping')
         return
 
     if not os.path.exists(directory):
+        sys.stdout.write('Creating Directory')
         os.mkdir(directory)
 
     for item in data[0]:
