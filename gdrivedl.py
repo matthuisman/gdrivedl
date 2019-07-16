@@ -77,8 +77,11 @@ def process_folder(id, directory, html=None):
             sys.stdout.write('\n')
 
 def process_file(id, file_path, file_size, confirm='', cookies=''):
-    url = FILE_URL.format(id=id, confirm=confirm)
+    if os.path.exists(file_path):
+        sys.stdout.write('File Exists. Skipping')
+        return
 
+    url     = FILE_URL.format(id=id, confirm=confirm)
     req     = Request(url, headers={'Cookie': cookies})
     resp    = urlopen(req)
     cookies = resp.headers.get('Set-Cookie') or ''
@@ -88,10 +91,6 @@ def process_file(id, file_path, file_size, confirm='', cookies=''):
         return process_file(id, file_path, file_size, confirm.group(1), cookies)
 
     sys.stdout.write(file_path+'\n')
-
-    if os.path.exists(file_path):
-        sys.stdout.write('Already Exists. Skipping')
-        return
 
     try:
         with open(file_path, 'wb') as f:
