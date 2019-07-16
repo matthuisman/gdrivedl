@@ -89,6 +89,10 @@ def process_file(id, file_path, file_size, confirm='', cookies=''):
 
     sys.stdout.write(file_path+'\n')
 
+    if os.path.exists(file_path):
+        sys.stdout.write('Already Exists. Skipping')
+        return
+
     try:
         with open(file_path, 'wb') as f:
             dl = 0
