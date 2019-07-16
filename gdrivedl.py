@@ -17,6 +17,7 @@ ID_PATTERNS     = [
 FILE_PATTERN    = re.compile("itemJson: (\[.*?);</script>", re.DOTALL|re.IGNORECASE)
 FOLDER_PATTERN  = re.compile("window\['_DRIVE_ivd'\] = '(.*?)';", re.DOTALL|re.IGNORECASE)
 CONFIRM_PATTERN = re.compile("download_warning[0-9A-Za-z_-]+=([0-9A-Za-z_-]+);", re.IGNORECASE)
+FOLDER_TYPE     = 'application/vnd.google-apps.folder'
 
 def process_item(id, directory):
     url = ITEM_URL.format(id=id)
@@ -47,8 +48,6 @@ def process_item(id, directory):
         sys.exit(1)
 
 def process_folder(id, directory, html=None):    
-    sys.stdout.write(directory+'\n')
-
     if not html:
         url  = FOLDER_URL.format(id=id)
         html = urlopen(url).read().decode('utf-8')
@@ -58,22 +57,23 @@ def process_folder(id, directory, html=None):
     data = data.encode().decode('unicode_escape')
     data = json.loads(data)
 
+    if not os.path.exists(directory):
+        os.mkdir(directory)
+        sys.stdout.write(directory+'\ [Created]\n')
+    else:
+        sys.stdout.write(directory+'\ [Exists]\n')
+
     if not data[0]:
-        sys.stdout.write('Empty Directory. Skipping')
         return
 
-    if not os.path.exists(directory):
-        sys.stdout.write('Creating Directory')
-        os.mkdir(directory)
-
-    for item in data[0]:
+    for item in sorted(data[0], key=lambda i: i[3] == FOLDER_TYPE):
         item_id   = item[0]
         item_name = item[2]
         item_type = item[3]
         item_size = item[13]
         item_path = os.path.join(directory, item_name)
         
-        if item_type == 'application/vnd.google-apps.folder':
+        if item_type == FOLDER_TYPE:
             process_folder(item_id, item_path)
         else:
             process_file(item_id, item_path, int(item_size))
@@ -81,7 +81,7 @@ def process_folder(id, directory, html=None):
 
 def process_file(id, file_path, file_size, confirm='', cookies=''):
     if os.path.exists(file_path):
-        sys.stdout.write(file_path+'\nFile Exists. Skipping')
+        sys.stdout.write(file_path+' [Exists]')
         return
 
     url     = FILE_URL.format(id=id, confirm=confirm)
