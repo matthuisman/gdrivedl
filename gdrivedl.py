@@ -1,9 +1,15 @@
+#!/usr/bin/env python
 import sys
 import re
 import json
 import os
 
-from urllib.request import Request, urlopen
+try:
+    #Python3
+    from urllib.request import Request, urlopen
+except:
+    #python2
+    from urllib2 import Request, urlopen
 
 ITEM_URL        = 'https://drive.google.com/open?id={id}'
 FILE_URL        = 'https://docs.google.com/uc?export=download&id={id}&confirm={confirm}'
