@@ -5,6 +5,7 @@ Google Drive Download Script
 * No external dependencies
 * Works with shared files or folders
 * Works with large files
+* Files / Folders must have been shared via link
 
 ### Argument 1 ###
 URL containing ID or ID
