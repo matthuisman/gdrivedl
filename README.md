@@ -13,6 +13,7 @@ URL containing ID or ID
 Directory to download to (must already exist)<br/>
 *Defaults to current directory*
 
+### Example Usage ###
 ```bash
 sudo curl https://raw.githubusercontent.com/matthuisman/gdrivedl/master/gdrivedl.py --output /usr/bin/gdrivedl
 sudo chmod +x /usr/bin/gdrivedl
