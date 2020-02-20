@@ -39,6 +39,15 @@ def process_item(id, directory):
         data  = json.loads(data)
         
         file_name = data[1]
+
+        #sometimes filname has whole link address, due to which file is not saved
+        if 'http' in file_name:
+            file_name= file_name.split(' ')[-1]
+        if 'http' in file_name:
+            print('Invalid File Name, please report to devs to fix')
+            sys.exit(1)
+
+
         file_size = int(data[25][2])
         file_path = os.path.join(directory, file_name)
 
