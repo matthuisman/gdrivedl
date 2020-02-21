@@ -2,6 +2,7 @@
 Google Drive Download Script
 
 * Python 2 / 3 Compatible
+* Supports all operating systems
 * No external dependencies
 * Works with shared files or folders
 * Works with large files
