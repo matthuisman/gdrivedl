@@ -16,9 +16,9 @@ FILE_URL        = 'https://docs.google.com/uc?export=download&id={id}&confirm={c
 FOLDER_URL      = 'https://drive.google.com/drive/folders/{id}'
 
 ID_PATTERNS     = [
-    re.compile('/file/d/([0-9A-Za-z_-]{33,})(?:/|$)', re.IGNORECASE), 
-    re.compile('id=([0-9A-Za-z_-]{33,})(?:&|$)', re.IGNORECASE), 
-    re.compile('([0-9A-Za-z_-]{33,})', re.IGNORECASE)
+    re.compile('/file/d/([0-9A-Za-z_-]{10,})(?:/|$)', re.IGNORECASE), 
+    re.compile('id=([0-9A-Za-z_-]{10,})(?:&|$)', re.IGNORECASE), 
+    re.compile('([0-9A-Za-z_-]{10,})', re.IGNORECASE)
 ]
 FILE_PATTERN    = re.compile("itemJson: (\[.*?);</script>", re.DOTALL|re.IGNORECASE)
 FOLDER_PATTERN  = re.compile("window\['_DRIVE_ivd'\] = '(.*?)';", re.DOTALL|re.IGNORECASE)
