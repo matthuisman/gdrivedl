@@ -111,6 +111,9 @@ def process_file(id, file_path, file_size, confirm='', cookies=''):
                 if not chunk:
                     break
 
+                if 'Too many users have viewed or downloaded this file recently' in chunk:
+                    raise Exception('Quota exceeded for this file')
+
                 dl += len(chunk)
                 f.write(chunk)
                 done = int(50 * dl / file_size)
