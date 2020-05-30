@@ -12,7 +12,7 @@ Google Drive Download Script
 ### Usage
 
 ```bash
-gdrivedl.py <URL> <DIRECTORY>
+python gdrivedl.py <URL> <DIRECTORY>
 ```
 -   URL is Shared Goolge Drive URL containing ID
 -   DIRECTORY (Optional, defaults to current directory `./`)
