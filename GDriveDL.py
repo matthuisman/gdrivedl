@@ -144,8 +144,8 @@ def get_arg(pos, default=None):
 
 
 if __name__ == '__main__':
-    url = get_arg(1)
-    directory = get_arg(2, './')
+    url = get_arg(1, '').strip()
+    directory = get_arg(2, './').strip()
     id = ''
 
     if not url:
