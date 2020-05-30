@@ -19,7 +19,7 @@ Has two arguments:
 Eg:
 
 ```bash
-sudo curl https://raw.githubusercontent.com/matthuisman/GDriveDL/master/GDriveDL.py --output GDriveDL
+sudo curl https://raw.githubusercontent.com/matthuisman/GDriveDL/master/gdrivedl.py --output GDriveDL
 
 sudo chmod +x GDriveDL
 ```
