@@ -11,10 +11,14 @@ Google Drive Download Script
 
 ### How to run the script
 
+```bash
+./GDriveDL <URL> <DIRECTORY>
+```
+
 Has two arguments:
 
--   URL containing ID (Shared URL link)
--   DIRECTORY (Optional, defaults to `./`)
+-   URL is Shared Goolge Drive URL containing ID
+-   DIRECTORY (Optional, defaults to current directory `./`)
 
 Eg:
 
@@ -22,12 +26,6 @@ Eg:
 sudo curl https://raw.githubusercontent.com/matthuisman/gdrivedl/master/gdrivedl.py --output GDriveDL
 
 sudo chmod +x GDriveDL
-```
-
-```
-./GDriveDL <URL> <DIRECTORY>
-
-OR
 
 ./GDriveDL https://drive.google.com/open?id=1yXsJq7TTMgUVXbOnCalyupESFN-tm2nc ./some_folder
 ```
