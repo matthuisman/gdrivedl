@@ -1,8 +1,15 @@
+#!/usr/bin/env python
 import json
 import os
 import re
 import sys
-from urllib.request import Request, urlopen
+
+try:
+    #Python3
+    from urllib.request import Request, urlopen
+except ImportError:
+    #Python2
+    from urllib2 import Request, urlopen
 
 ITEM_URL = 'https://drive.google.com/open?id={id}'
 FILE_URL = 'https://docs.google.com/uc?export=download&id={id}&confirm={confirm}'
@@ -65,9 +72,10 @@ def process_folder(id, directory, html=None):
 
     if not os.path.exists(directory):
         os.mkdir(directory)
-        sys.stdout.write(f"Directory: {directory} [Created]\n")
+        sys.stdout.write('Directory: {directory} [Created]\n'.format(directory=directory))
     else:
-        sys.stdout.write(f"Directory: {directory} [Exists]\n")
+        sys.stdout.write('Directory: {directory} [Exists]\n'.format(directory=directory))
+
     if not data[0]:
         return
 
@@ -87,7 +95,7 @@ def process_folder(id, directory, html=None):
 
 def process_file(id, file_path, file_size, confirm='', cookies=''):
     if os.path.exists(file_path):
-        sys.stdout.write(f'{file_path} [Exists]\n')
+        sys.stdout.write('{file_path} [Exists]\n'.format(file_path=file_path))
         return
 
     url = FILE_URL.format(id=id, confirm=confirm)

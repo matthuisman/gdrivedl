@@ -2,7 +2,7 @@
 
 Google Drive Download Script
 
--   Python 3 Support (Python 2 obsolete)
+-   Python 2 / 3 Compatible
 -   Supports all operating systems
 -   No external dependencies
 -   Works with shared files or folders
