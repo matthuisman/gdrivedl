@@ -61,7 +61,7 @@ def process_item(id, directory):
 
 
 def process_folder(id, directory, html=None):
-    if html is None:
+    if not html:
         url = FOLDER_URL.format(id=id)
         html = urlopen(url).read().decode('utf-8')
 
@@ -146,10 +146,10 @@ def get_arg(pos, default=None):
 if __name__ == '__main__':
     url = get_arg(1)
     directory = get_arg(2, './')
-    id = None
+    id = ''
 
-    if url is None:
-        sys.stderr.write('A URL is required first argument')
+    if not url:
+        sys.stderr.write('A Google Drive URL is required')
         sys.exit(1)
 
     for pattern in ID_PATTERNS:
@@ -158,7 +158,7 @@ if __name__ == '__main__':
             id = match.group(1)
             break
 
-    if id is None:
+    if not id:
         sys.stderr.write('Unable to get ID from {}'.format(url))
         sys.exit(1)
 
