@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=GDriveDL
+Comment=Google Drive Downloader
+Exec=GDriveDL
+Icon=@HOME@/.local/share/pixmaps/GDriveDL.png
+Terminal=false
+Type=Application
+Categories=Utility;
+StartupNotify=false

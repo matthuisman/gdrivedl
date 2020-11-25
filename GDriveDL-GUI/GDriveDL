@@ -1,0 +1,31 @@
+#!/bin/bash
+
+set -e
+
+if ! command -v zenity >/dev/null; then
+	echo "Please install zenity."
+	exit 1
+fi
+
+# Ask for a GDrive-URL
+while [[ -z "$GDURL" ]]; do
+	GDURL="$(zenity --title=GDriveDL --entry --text="Google Drive URL")"
+	if [[ $? -eq 1 ]]; then
+		# Cancel button pressed
+		exit 0
+	fi
+done
+
+# Start download
+if gdrivedl.py "$GDURL" "$HOME"/Downloads >/dev/null; then
+	echo "# Finish"
+else
+	echo "# Failed"
+fi | {
+	if zenity --title=GDriveDL --progress --pulsate --text="Downloading..."; then
+		xdg-open "$HOME"/Downloads
+	else
+		# shellcheck disable=SC2046
+		kill $(ps -o pid= -C python)
+	fi
+}
