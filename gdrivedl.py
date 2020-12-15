@@ -81,7 +81,7 @@ def sanitize(filename):
     return filename
 
 
-def process_item(id, directory, progress=True):
+def process_item(id, directory, filename=None, progress=True):
     url = ITEM_URL.format(id=id)
     resp = urlopen(url)
     url = resp.geturl()
@@ -93,12 +93,22 @@ def process_item(id, directory, progress=True):
         data = data.replace(r'\x5b', '[').replace(r'\x22', '"').replace(r'\x5d', ']').replace(r'\n','')
         data = json.loads(data)
 
-        file_name = sanitize(data[1])
         file_size = int(data[25][2])
-        file_path = os.path.join(directory, file_name)
+        if filename is None:
+            filename = sanitize(data[1])
+            file_path = os.path.join(directory, filename)
+        else:
+            # treat filename as relative to directory if they are both specified
+            file_path = filename if os.path.isabs(filename) else os.path.join(directory, filename)
+
+            if not os.path.exists(directory):
+                os.mkdir(directory)
+                logging.info('Directory: {directory} [Created]'.format(directory=directory))
 
         process_file(id, file_path, file_size, progress=progress)
     elif '/folders/' in url:
+        if filename:
+            logger.warn("Ignoring --directory-prefix option for folder download")
         process_folder(id, directory, html=html, progress=progress)
     elif 'ServiceLogin' in url:
         logging.error('Id {} does not have link sharing enabled'.format(id))
@@ -192,7 +202,8 @@ def process_file(id, file_path, file_size, confirm='', cookies='', progress=True
 def main(args=None):
     parser = argparse.ArgumentParser(description='Download google drive files')
     parser.add_argument("url", help="Download URL or ID")
-    parser.add_argument("directory", default='./', nargs='?', help="output directory")
+    parser.add_argument("-P", "--directory-prefix", default='.', help="Output directory")
+    parser.add_argument("-O", "--output-document", help="Output filename. Defaults to the server filename. Not valid for folders")
     parser.add_argument("-q", "--quiet", help="Disable progress bar",
         default=False, action="store_true")
     args = parser.parse_args(args)
@@ -204,7 +215,6 @@ def main(args=None):
     progress = not args.quiet
 
     url = args.url
-    directory = args.directory
     id = ''
 
     for pattern in ID_PATTERNS:
@@ -217,7 +227,7 @@ def main(args=None):
         logging.error('Unable to get ID from {}'.format(url))
         sys.exit(1)
 
-    process_item(id, directory, progress=progress)
+    process_item(id, directory=args.directory_prefix, filename=args.output_document, progress=progress)
 
 
 if __name__ == "__main__":
