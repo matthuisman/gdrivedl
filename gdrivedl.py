@@ -5,6 +5,8 @@ import os
 import re
 import sys
 import unicodedata
+import argparse
+import logging
 
 try:
     #Python3
@@ -99,10 +101,10 @@ def process_item(id, directory):
     elif '/folders/' in url:
         process_folder(id, directory, html=html)
     elif 'ServiceLogin' in url:
-        sys.stderr.write('Id {} does not have link sharing enabled'.format(id))
+        logging.error('Id {} does not have link sharing enabled'.format(id))
         sys.exit(1)
     else:
-        sys.stderr.write('That id {} returned an unknown url'.format(id))
+        logging.error('That id {} returned an unknown url'.format(id))
         sys.exit(1)
 
 
@@ -185,21 +187,19 @@ def process_file(id, file_path, file_size, confirm='', cookies=''):
     output('\n')
 
 
-def get_arg(pos, default=None):
-    try:
-        return sys.argv[pos]
-    except IndexError:
-        return default
+def main(args=None):
+    parser = argparse.ArgumentParser(description='Download google drive files')
+    parser.add_argument("url", help="Download URL or ID")
+    parser.add_argument("directory", default='./', nargs='?', help="output directory")
+    parser.add_argument("-v", "--verbose", help="Long messages",
+        dest="verbose", default=False, action="store_true")
+    args = parser.parse_args(args)
 
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG if args.verbose else logging.WARN)
 
-if __name__ == '__main__':
-    url = get_arg(1, '').strip()
-    directory = get_arg(2, './').strip()
+    url = args.url
+    directory = args.directory
     id = ''
-
-    if not url:
-        sys.stderr.write('A Google Drive URL is required')
-        sys.exit(1)
 
     for pattern in ID_PATTERNS:
         match = pattern.search(url)
@@ -208,7 +208,12 @@ if __name__ == '__main__':
             break
 
     if not id:
-        sys.stderr.write('Unable to get ID from {}'.format(url))
+        logging.error('Unable to get ID from {}'.format(url))
         sys.exit(1)
 
     process_item(id, directory)
+
+
+if __name__ == "__main__":
+    main()
+
