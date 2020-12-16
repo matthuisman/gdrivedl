@@ -14,25 +14,10 @@ Google Drive Download Script
 ```bash
 python gdrivedl.py <URL>
 ```
--   URL is Shared Goolge Drive URL containing ID
+-   URL is a shared Google Drive URL
 
 ### Options
-Options derive from `wget` conventions where possible.
-
-- `-P` `--directory-prefix` <DIRECTORY>` Download to a different directory
-  (default to the current directory)
+- `-P` `--directory-prefix` Output directory (default is current directory)
 - `-O` `--output-document` Download to a particular filename (defaults to the
-  server filename). Not valid for folder downloads.
-- `-q` `--quiet` Don't print progress bar
-- `-v` `--verbose` Additional messages
-
-### Example Linux Usage
-
-```bash
-sudo curl https://raw.githubusercontent.com/matthuisman/gdrivedl/master/gdrivedl.py --output GDriveDL
-
-sudo chmod +x GDriveDL
-
-./GDriveDL https://drive.google.com/open?id=1yXsJq7TTMgUVXbOnCalyupESFN-tm2nc -P ./some_folder
-```
-
+  GDrive filename). Not valid when downloading folders.
+- `-q` `--quiet` Disable console output
