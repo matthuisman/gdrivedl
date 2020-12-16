@@ -5,6 +5,8 @@ import os
 import re
 import sys
 import unicodedata
+import argparse
+import logging
 
 try:
     #Python3
@@ -79,7 +81,7 @@ def sanitize(filename):
     return filename
 
 
-def process_item(id, directory):
+def process_item(id, directory, filename=None, progress=True):
     url = ITEM_URL.format(id=id)
     resp = urlopen(url)
     url = resp.geturl()
@@ -91,22 +93,32 @@ def process_item(id, directory):
         data = data.replace(r'\x5b', '[').replace(r'\x22', '"').replace(r'\x5d', ']').replace(r'\n','')
         data = json.loads(data)
 
-        file_name = sanitize(data[1])
         file_size = int(data[25][2])
-        file_path = os.path.join(directory, file_name)
+        if filename is None:
+            filename = sanitize(data[1])
+            file_path = os.path.join(directory, filename)
+        else:
+            # treat filename as relative to directory if they are both specified
+            file_path = filename if os.path.isabs(filename) else os.path.join(directory, filename)
 
-        process_file(id, file_path, file_size)
+            if not os.path.exists(directory):
+                os.mkdir(directory)
+                logging.info('Directory: {directory} [Created]'.format(directory=directory))
+
+        process_file(id, file_path, file_size, progress=progress)
     elif '/folders/' in url:
-        process_folder(id, directory, html=html)
+        if filename:
+            logger.warn("Ignoring --directory-prefix option for folder download")
+        process_folder(id, directory, html=html, progress=progress)
     elif 'ServiceLogin' in url:
-        sys.stderr.write('Id {} does not have link sharing enabled'.format(id))
+        logging.error('Id {} does not have link sharing enabled'.format(id))
         sys.exit(1)
     else:
-        sys.stderr.write('That id {} returned an unknown url'.format(id))
+        logging.error('That id {} returned an unknown url'.format(id))
         sys.exit(1)
 
 
-def process_folder(id, directory, html=None):
+def process_folder(id, directory, html=None, progress=True):
     if not html:
         url = FOLDER_URL.format(id=id)
         html = urlopen(url).read().decode('utf-8')
@@ -118,9 +130,9 @@ def process_folder(id, directory, html=None):
 
     if not os.path.exists(directory):
         os.mkdir(directory)
-        output('Directory: {directory} [Created]\n'.format(directory=directory))
+        logging.info('Directory: {directory} [Created]'.format(directory=directory))
     else:
-        output('Directory: {directory} [Exists]\n'.format(directory=directory))
+        logging.info('Directory: {directory} [Exists]'.format(directory=directory))
 
     if not data[0]:
         return
@@ -133,14 +145,14 @@ def process_folder(id, directory, html=None):
         item_path = os.path.join(directory, item_name)
 
         if item_type == FOLDER_TYPE:
-            process_folder(item_id, item_path)
+            process_folder(item_id, item_path, progress=progress)
         else:
-            process_file(item_id, item_path, int(item_size))
+            process_file(item_id, item_path, int(item_size), progress=progress)
 
 
-def process_file(id, file_path, file_size, confirm='', cookies=''):
+def process_file(id, file_path, file_size, confirm='', cookies='', progress=True):
     if os.path.exists(file_path):
-        output('{file_path} [Exists]\n'.format(file_path=file_path))
+        logging.info('{file_path} [Exists]\n'.format(file_path=file_path))
         return
 
     url = FILE_URL.format(id=id, confirm=confirm)
@@ -151,7 +163,7 @@ def process_file(id, file_path, file_size, confirm='', cookies=''):
 
     if not confirm and 'download_warning' in cookies:
         confirm = CONFIRM_PATTERN.search(cookies)
-        return process_file(id, file_path, file_size, confirm.group(1), cookies)
+        return process_file(id, file_path, file_size, confirm.group(1), cookies, progress=progress)
 
     output(file_path + '\n')
 
@@ -168,38 +180,42 @@ def process_file(id, file_path, file_size, confirm='', cookies=''):
 
                 dl += len(chunk)
                 f.write(chunk)
-                done = int(50 * dl / file_size)
-                output("\r[{}{}] {:.2f}MB/{:.2f}MB".format(
-                    '=' * done,
-                    ' ' *
-                    (50 - done),
-                    dl / 1024 / 1024,
-                    file_size / 1024 / 1024
-                ))
-                sys.stdout.flush()
+                if progress:
+                    done = int(50 * dl / file_size)
+                    output("\r[{}{}] {:.2f}MB/{:.2f}MB".format(
+                        '=' * done,
+                        ' ' *
+                        (50 - done),
+                        dl / 1024 / 1024,
+                        file_size / 1024 / 1024
+                    ))
+                    sys.stdout.flush()
     except:
         if os.path.exists(file_path):
             os.remove(file_path)
         raise
 
-    output('\n')
+    if progress:
+        output('\n')
 
 
-def get_arg(pos, default=None):
-    try:
-        return sys.argv[pos]
-    except IndexError:
-        return default
+def main(args=None):
+    parser = argparse.ArgumentParser(description='Download google drive files')
+    parser.add_argument("url", help="Download URL or ID")
+    parser.add_argument("-P", "--directory-prefix", default='.', help="Output directory")
+    parser.add_argument("-O", "--output-document", help="Output filename. Defaults to the server filename. Not valid for folders")
+    parser.add_argument("-q", "--quiet", help="Disable progress bar",
+        default=False, action="store_true")
+    args = parser.parse_args(args)
 
+    if args.quiet:
+        logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.WARN)
+    else:
+        logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+    progress = not args.quiet
 
-if __name__ == '__main__':
-    url = get_arg(1, '').strip()
-    directory = get_arg(2, './').strip()
+    url = args.url
     id = ''
-
-    if not url:
-        sys.stderr.write('A Google Drive URL is required')
-        sys.exit(1)
 
     for pattern in ID_PATTERNS:
         match = pattern.search(url)
@@ -208,7 +224,12 @@ if __name__ == '__main__':
             break
 
     if not id:
-        sys.stderr.write('Unable to get ID from {}'.format(url))
+        logging.error('Unable to get ID from {}'.format(url))
         sys.exit(1)
 
-    process_item(id, directory)
+    process_item(id, directory=args.directory_prefix, filename=args.output_document, progress=progress)
+
+
+if __name__ == "__main__":
+    main()
+
