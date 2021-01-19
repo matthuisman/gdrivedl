@@ -152,7 +152,7 @@ class GDriveDL(object):
 
 
     def process_file(self, id, file_path, file_size, confirm='', cookies=''):
-        if not self._overwrite and os.path.exists(file_path):
+        if not self._overwrite and (os.path.exists(file_path) and os.path.getsize(file_path) == file_size):
             logging.info('{file_path} [Exists]'.format(file_path=file_path))
             return
 
