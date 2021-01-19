@@ -81,9 +81,12 @@ def sanitize(filename):
     return filename
 
 class GDriveDL(object):
-    def __init__(self, quiet=False, overwrite=False):
+    def __init__(self, quiet=False, overwrite=False, sync=False):
         self._quiet = quiet
         self._overwrite = overwrite
+        self._sync = sync
+        self._files = []
+        self._folders = []
 
     def process_item(self, id, directory, filename=None):
         url = ITEM_URL.format(id=id)
@@ -120,8 +123,25 @@ class GDriveDL(object):
             logging.error('That id {} returned an unknown url'.format(id))
             sys.exit(1)
 
+        if self._sync:
+            self._sync_folder(directory)
+
+    def _sync_folder(self, directory):
+        for item in os.listdir(directory):
+            item_path = os.path.join(directory, item)
+            if os.path.isfile(item_path) and item_path not in self._files:
+                os.remove(item_path)
+                logging.info('{file} [Deleted]'.format(file=item_path))
+            elif os.path.isdir(item_path):
+                self._sync_folder(item_path)
+                if item_path not in self._folders and not os.listdir(item_path):
+                    os.rmdir(item_path)
+                    logging.info('{folder} [Deleted]'.format(folder=item_path))
 
     def process_folder(self, id, directory, html=None):
+        if self._sync:
+            self._folders.append(directory)
+
         if not html:
             url = FOLDER_URL.format(id=id)
             html = urlopen(url).read().decode('utf-8')
@@ -134,6 +154,8 @@ class GDriveDL(object):
         if not os.path.exists(directory):
             os.mkdir(directory)
             logging.info('Directory: {directory} [Created]'.format(directory=directory))
+        else:
+            logging.info('{file_path} [Exists]'.format(file_path=directory))
 
         if not data[0]:
             return
@@ -152,6 +174,9 @@ class GDriveDL(object):
 
 
     def process_file(self, id, file_path, file_size, confirm='', cookies=''):
+        if self._sync:
+            self._files.append(file_path)
+
         if not self._overwrite and (os.path.exists(file_path) and os.path.getsize(file_path) == file_size):
             logging.info('{file_path} [Exists]'.format(file_path=file_path))
             return
@@ -207,8 +232,8 @@ def main(args=None):
     parser.add_argument("url", help="Shared Google Drive URL")
     parser.add_argument("-P", "--directory-prefix", default='.', help="Output directory (default is current directory)")
     parser.add_argument("-O", "--output-document", help="Output filename. Defaults to the GDrive filename. Not valid when downloading folders")
-    parser.add_argument("-q", "--quiet", help="Disable console output",
-        default=False, action="store_true")
+    parser.add_argument("-s", "--sync", help="Sync local folder with remote folder", default=False, action="store_true")
+    parser.add_argument("-q", "--quiet", help="Disable console output", default=False, action="store_true")
     args = parser.parse_args(args)
 
     if args.quiet:
@@ -229,7 +254,11 @@ def main(args=None):
         logging.error('Unable to get ID from {}'.format(url))
         sys.exit(1)
 
-    gdrive = GDriveDL(quiet=args.quiet)
+    if args.sync and args.directory_prefix == parser.get_default('directory_prefix'):
+        logging.error('-s (--sync) only available when using -P (--directory-prefix)')
+        sys.exit(1)
+
+    gdrive = GDriveDL(quiet=args.quiet, sync=args.sync)
     gdrive.process_item(id, directory=args.directory_prefix, filename=args.output_document)
 
 
