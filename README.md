@@ -20,4 +20,5 @@ python gdrivedl.py <URL>
 - `-P` `--directory-prefix` Output directory (default is current directory)
 - `-O` `--output-document` Download to a particular filename (defaults to the
   GDrive filename). Not valid when downloading folders.
+- `-s` `--sync` Sync local folder to remote folder (must use with -P --directory-prefix)
 - `-q` `--quiet` Disable console output

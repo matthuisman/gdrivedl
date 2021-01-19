@@ -232,7 +232,7 @@ def main(args=None):
     parser.add_argument("url", help="Shared Google Drive URL")
     parser.add_argument("-P", "--directory-prefix", default='.', help="Output directory (default is current directory)")
     parser.add_argument("-O", "--output-document", help="Output filename. Defaults to the GDrive filename. Not valid when downloading folders")
-    parser.add_argument("-s", "--sync", help="Sync local folder with remote folder", default=False, action="store_true")
+    parser.add_argument("-s", "--sync", help="Sync local folder to remote folder (must use with -P --directory-prefix)", default=False, action="store_true")
     parser.add_argument("-q", "--quiet", help="Disable console output", default=False, action="store_true")
     args = parser.parse_args(args)
 
