@@ -159,12 +159,6 @@ class GDriveDL(object):
         resp = self._request(url)
         html = resp.read().decode('utf-8')
 
-        if not os.path.exists(directory):
-            os.mkdir(directory)
-            logging.info('Directory: {directory} [Created]'.format(directory=directory))
-        else:
-            logging.info('{file_path} [Exists]'.format(file_path=directory))
-
         for match in re.findall(LARGE_FOLDER_PATTERN, html):
             url, item_name = match
             item_path = os.path.join(directory, item_name)
@@ -199,9 +193,6 @@ class GDriveDL(object):
         data = data.replace(r'\x5b', '[').replace(r'\x22', '"').replace(r'\x5d', ']').replace(r'\n','')
         data = json.loads(data)
 
-        if len(data[0]) >= FOLDER_LIMIT:
-            return self.process_large_folder(id, directory)
-
         if not os.path.exists(directory):
             os.mkdir(directory)
             logging.info('Directory: {directory} [Created]'.format(directory=directory))
@@ -210,6 +201,9 @@ class GDriveDL(object):
 
         if not data[0]:
             return
+
+        if len(data[0]) >= FOLDER_LIMIT:
+            return self.process_large_folder(id, directory)
 
         for item in sorted(data[0], key=lambda i: i[3] == FOLDER_TYPE):
             item_id = item[0]
