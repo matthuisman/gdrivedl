@@ -10,23 +10,30 @@ import logging
 
 try:
     #Python3
-    from urllib.request import Request, urlopen
+    from urllib.request import Request, urlopen, build_opener, HTTPCookieProcessor
+    from http.cookiejar import CookieJar
 except ImportError:
     #Python2
-    from urllib2 import Request, urlopen
+    from urllib2 import Request, urlopen, build_opener, HTTPCookieProcessor
+    from cookielib import CookieJar
 
 ITEM_URL = 'https://drive.google.com/open?id={id}'
 FILE_URL = 'https://docs.google.com/uc?export=download&id={id}&confirm={confirm}'
 FOLDER_URL = 'https://drive.google.com/drive/folders/{id}'
+LARGE_FOLDER_URL = 'https://drive.google.com/embeddedfolderview?id={id}#list'
+FOLDER_LIMIT = 50
 
 ID_PATTERNS = [
     re.compile('/file/d/([0-9A-Za-z_-]{10,})(?:/|$)', re.IGNORECASE),
+    re.compile('/folders/([0-9A-Za-z_-]{10,})(?:/|$)', re.IGNORECASE),
     re.compile('id=([0-9A-Za-z_-]{10,})(?:&|$)', re.IGNORECASE),
     re.compile('([0-9A-Za-z_-]{10,})', re.IGNORECASE)
 ]
 FILE_PATTERN = re.compile("itemJson: (\[.*?)};</script>",
                           re.DOTALL | re.IGNORECASE)
 FOLDER_PATTERN = re.compile("window\['_DRIVE_ivd'\] = '(.*?)';",
+                            re.DOTALL | re.IGNORECASE)
+LARGE_FOLDER_PATTERN = re.compile('<a href="(https://drive.google.com/.*?)".*?<div class="flip-entry-title">(.*?)</div>',
                             re.DOTALL | re.IGNORECASE)
 CONFIRM_PATTERN = re.compile("download_warning[0-9A-Za-z_-]+=([0-9A-Za-z_-]+);",
                              re.IGNORECASE)
@@ -87,10 +94,16 @@ class GDriveDL(object):
         self._sync = sync
         self._files = []
         self._folders = []
+        self._opener = build_opener(HTTPCookieProcessor(CookieJar()))
+
+    def _request(self, url):
+        req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        resp = self._opener.open(req)
+        return resp
 
     def process_item(self, id, directory, filename=None):
         url = ITEM_URL.format(id=id)
-        resp = urlopen(url)
+        resp = self._request(url)
         url = resp.geturl()
         html = resp.read().decode('utf-8')
 
@@ -138,18 +151,56 @@ class GDriveDL(object):
                     os.rmdir(item_path)
                     logging.info('{folder} [Deleted]'.format(folder=item_path))
 
+    def process_large_folder(self, id, directory):
+        if self._sync:
+            self._folders.append(directory)
+
+        url = LARGE_FOLDER_URL.format(id=id)
+        resp = self._request(url)
+        html = resp.read().decode('utf-8')
+
+        if not os.path.exists(directory):
+            os.mkdir(directory)
+            logging.info('Directory: {directory} [Created]'.format(directory=directory))
+        else:
+            logging.info('{file_path} [Exists]'.format(file_path=directory))
+
+        for match in re.findall(LARGE_FOLDER_PATTERN, html):
+            url, item_name = match
+            item_path = os.path.join(directory, item_name)
+
+            id = None
+            for pattern in ID_PATTERNS:
+                match = pattern.search(url)
+                if match:
+                    id = match.group(1)
+                    break
+
+            if not id:
+                logging.debug('Unable to get ID from {}'.format(url))
+                continue
+
+            if '/file/' in url:
+                self.process_file(id, item_path)
+            elif '/folders/' in url:
+                self.process_folder(id, directory)
+
     def process_folder(self, id, directory, html=None):
         if self._sync:
             self._folders.append(directory)
 
         if not html:
             url = FOLDER_URL.format(id=id)
-            html = urlopen(url).read().decode('utf-8')
+            resp = self._request(url)
+            html = resp.read().decode('utf-8')
 
         match = FOLDER_PATTERN.search(html)
         data = match.group(1).replace('\/', '/')
         data = data.replace(r'\x5b', '[').replace(r'\x22', '"').replace(r'\x5d', ']').replace(r'\n','')
         data = json.loads(data)
+
+        if len(data[0]) >= FOLDER_LIMIT:
+            return self.process_large_folder(id, directory)
 
         if not os.path.exists(directory):
             os.mkdir(directory)
@@ -172,24 +223,22 @@ class GDriveDL(object):
             else:
                 self.process_file(item_id, item_path, int(item_size))
 
-
-    def process_file(self, id, file_path, file_size, confirm='', cookies=''):
+    def process_file(self, id, file_path, file_size=None, confirm=''):
         if self._sync:
             self._files.append(file_path)
 
-        if not self._overwrite and (os.path.exists(file_path) and os.path.getsize(file_path) == file_size):
+        if not self._overwrite and (os.path.exists(file_path) and (not file_size or os.path.getsize(file_path) == file_size)):
             logging.info('{file_path} [Exists]'.format(file_path=file_path))
             return
 
         url = FILE_URL.format(id=id, confirm=confirm)
-        req = Request(url, headers={'Cookie': cookies,
-                                    'User-Agent': 'Mozilla/5.0'})
-        resp = urlopen(req)
+        resp = self._request(url)
+
         cookies = resp.headers.get('Set-Cookie') or ''
 
         if not confirm and 'download_warning' in cookies:
             confirm = CONFIRM_PATTERN.search(cookies)
-            return self.process_file(id, file_path, file_size, confirm.group(1), cookies)
+            return self.process_file(id, file_path, file_size, confirm.group(1))
 
         if not self._quiet:
             output(file_path + '\n')
@@ -209,14 +258,19 @@ class GDriveDL(object):
                     dl += len(chunk)
                     f.write(chunk)
                     if not self._quiet:
-                        done = int(50 * dl / file_size)
-                        output("\r[{}{}] {:.2f}MB/{:.2f}MB".format(
-                            '=' * done,
-                            ' ' *
-                            (50 - done),
-                            dl / 1024 / 1024,
-                            file_size / 1024 / 1024
-                        ))
+                        if file_size:
+                            done = int(50 * dl / file_size)
+                            output("\r[{}{}] {:.2f}MB/{:.2f}MB".format(
+                                '=' * done,
+                                ' ' *
+                                (50 - done),
+                                dl / 1024 / 1024,
+                                file_size / 1024 / 1024
+                            ))
+                        else:
+                            output("\r{:.2f}MB".format(
+                                dl / 1024 / 1024,
+                            ))
                         sys.stdout.flush()
         except:
             if os.path.exists(file_path):
@@ -264,4 +318,3 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
-
