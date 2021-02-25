@@ -101,7 +101,7 @@ class GDriveDL(object):
         self._opener = build_opener(HTTPCookieProcessor(CookieJar()))
 
     def _request(self, url):
-        logging.info('Requesting: {}'.format(url))
+        logging.debug('Requesting: {}'.format(url))
         req = Request(url, headers={'User-Agent': USER_AGENT})
         return self._opener.open(req)
 
