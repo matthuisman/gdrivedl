@@ -113,7 +113,7 @@ class GDriveDL(object):
             resp = self._request(url)
             url = resp.geturl()
 
-        if '/file/' in url.lower():
+        if '/file/' in url.lower() or '/uc?' in url.lower():
             self.process_file(id, directory, filename=filename)
         elif '/folders/' in url.lower():
             if filename:
