@@ -7,6 +7,7 @@ import sys
 import unicodedata
 import argparse
 import logging
+from contextlib import contextmanager
 
 try:
     #Python3
@@ -100,22 +101,29 @@ class GDriveDL(object):
         self._create_empty_dirs = True
         self._opener = build_opener(HTTPCookieProcessor(CookieJar()))
 
+    @contextmanager
     def _request(self, url):
         logging.debug('Requesting: {}'.format(url))
         req = Request(url, headers={'User-Agent': USER_AGENT})
-        return self._opener.open(req)
+
+        f = self._opener.open(req)
+        try:
+            yield f
+        finally:
+            f.close()
 
     def process_url(self, url, directory, filename=None):
         id = url_to_id(url)
+        url = url.lower()
 
         if '://' not in url:
             url = ITEM_URL.format(id=id)
-            resp = self._request(url)
-            url = resp.geturl()
+            with self._request(url) as resp:
+                url = resp.geturl()
 
-        if '/file/' in url.lower() or '/uc?' in url.lower():
+        if '/file/' in url or '/uc?' in url:
             self.process_file(id, directory, filename=filename)
-        elif '/folders/' in url.lower():
+        elif '/folders/' in url:
             if filename:
                 logging.warn("Ignoring --output-document option for folder download")
             self.process_folder(id, directory)
@@ -124,9 +132,8 @@ class GDriveDL(object):
             sys.exit(1)
 
     def process_folder(self, id, directory):
-        url = FOLDER_URL.format(id=id)
-        resp = self._request(url)
-        html = resp.read().decode('utf-8')
+        with self._request(FOLDER_URL.format(id=id)) as resp:
+            html = resp.read().decode('utf-8')
 
         matches = re.findall(FOLDER_PATTERN, html)
 
@@ -157,55 +164,55 @@ class GDriveDL(object):
                 return
 
         url = FILE_URL.format(id=id, confirm=confirm)
-        resp = self._request(url)
 
-        if 'ServiceLogin' in resp.url:
-            logging.error('File: {} does not have link sharing enabled'.format(id))
-            sys.exit(1)
+        with self._request(url) as resp:
+            if 'ServiceLogin' in resp.url:
+                logging.error('File: {} does not have link sharing enabled'.format(id))
+                sys.exit(1)
 
-        cookies = resp.headers.get('Set-Cookie') or ''
-        if not confirm and 'download_warning' in cookies:
-            confirm = CONFIRM_PATTERN.search(cookies)
-            return self.process_file(id, directory, filename=filename, confirm=confirm.group(1))
+            cookies = resp.headers.get('Set-Cookie') or ''
+            if not confirm and 'download_warning' in cookies:
+                confirm = CONFIRM_PATTERN.search(cookies)
+                return self.process_file(id, directory, filename=filename, confirm=confirm.group(1))
 
-        if not file_path:
-            filename = FILENAME_PATTERN.search(resp.headers.get('content-disposition')).group(1)
-            file_path = os.path.join(directory, sanitize(filename))
-            if not self._overwrite and os.path.exists(file_path):
-                logging.info('{file_path} [Exists]'.format(file_path=file_path))
-                return
+            if not file_path:
+                filename = FILENAME_PATTERN.search(resp.headers.get('content-disposition')).group(1)
+                file_path = os.path.join(directory, sanitize(filename))
+                if not self._overwrite and os.path.exists(file_path):
+                    logging.info('{file_path} [Exists]'.format(file_path=file_path))
+                    return
 
-        directory = os.path.dirname(file_path)
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-            logging.info('Directory: {directory} [Created]'.format(directory=directory))
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+                logging.info('Directory: {directory} [Created]'.format(directory=directory))
 
-        try:
-            with open(file_path, 'wb') as f:
-                dl = 0
-                last_out = 0
-                while True:
-                    chunk = resp.read(CHUNKSIZE)
-                    if not chunk:
-                        break
+            try:
+                with open(file_path, 'wb') as f:
+                    dl = 0
+                    last_out = 0
+                    while True:
+                        chunk = resp.read(CHUNKSIZE)
+                        if not chunk:
+                            break
 
-                    if b'Too many users have viewed or downloaded this file recently' in chunk:
-                        logging.error('Quota exceeded for this file')
-                        sys.exit(1)
+                        if b'Too many users have viewed or downloaded this file recently' in chunk:
+                            logging.error('Quota exceeded for this file')
+                            sys.exit(1)
 
-                    dl += len(chunk)
-                    f.write(chunk)
-                    if not self._quiet and (not last_out or dl-last_out > 1048576):
-                        output("\r{} {:.2f}MB".format(
-                            file_path,
-                            dl / 1024 / 1024,
-                        ))
-                        last_out = dl
-                        sys.stdout.flush()
-        except:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            raise
+                        dl += len(chunk)
+                        f.write(chunk)
+                        if not self._quiet and (not last_out or dl-last_out > 1048576):
+                            output("\r{} {:.2f}MB".format(
+                                file_path,
+                                dl / 1024 / 1024,
+                            ))
+                            last_out = dl
+                            sys.stdout.flush()
+            except:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                raise
 
         if not self._quiet:
             output('\n')
