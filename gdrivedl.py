@@ -117,8 +117,7 @@ class GDriveDL(object):
         url = url.lower()
 
         if '://' not in url:
-            url = ITEM_URL.format(id=id)
-            with self._request(url) as resp:
+            with self._request(ITEM_URL.format(id=id)) as resp:
                 url = resp.geturl()
 
         if '/file/' in url or '/uc?' in url:
@@ -163,9 +162,7 @@ class GDriveDL(object):
                 logging.info('{file_path} [Exists]'.format(file_path=file_path))
                 return
 
-        url = FILE_URL.format(id=id, confirm=confirm)
-
-        with self._request(url) as resp:
+        with self._request(FILE_URL.format(id=id, confirm=confirm)) as resp:
             if 'ServiceLogin' in resp.url:
                 logging.error('File: {} does not have link sharing enabled'.format(id))
                 sys.exit(1)
