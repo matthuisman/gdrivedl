@@ -229,7 +229,7 @@ def main(args=None):
         logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
     if args.output_document and len(args.url) > 1:
-        logging.warning("Ignoring --output-document option for multiple file download")
+        logging.warning("Ignoring --output-document option for multiple url download")
         args.output_document = None
 
     gdrive = GDriveDL(quiet=args.quiet, overwrite=args.output_document is not None)
