@@ -124,7 +124,7 @@ class GDriveDL(object):
             self.process_file(id, directory, filename=filename)
         elif '/folders/' in url:
             if filename:
-                logging.warn("Ignoring --output-document option for folder download")
+                logging.warning("Ignoring --output-document option for folder download")
             self.process_folder(id, directory)
         else:
             logging.error('That id {} returned an unknown url {}'.format(id, url))
@@ -217,9 +217,9 @@ class GDriveDL(object):
 
 def main(args=None):
     parser = argparse.ArgumentParser(description='Download Google Drive files & folders')
-    parser.add_argument("url", help="Shared Google Drive URL")
+    parser.add_argument("url", help="Shared Google Drive URL(s)", nargs="*")
     parser.add_argument("-P", "--directory-prefix", default='.', help="Output directory (default is current directory)")
-    parser.add_argument("-O", "--output-document", help="Output filename. Defaults to the GDrive filename. Not valid when downloading folders")
+    parser.add_argument("-O", "--output-document", help="Output filename. Defaults to the GDrive filename. Only valid when downloading a single file.")
     parser.add_argument("-q", "--quiet", help="Disable console output", default=False, action="store_true")
     args = parser.parse_args(args)
 
@@ -228,21 +228,13 @@ def main(args=None):
     else:
         logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
-    url = args.url
-    id = ''
-
-    for pattern in ID_PATTERNS:
-        match = pattern.search(url)
-        if match:
-            id = match.group(1)
-            break
-
-    if not id:
-        logging.error('Unable to get ID from {}'.format(url))
-        sys.exit(1)
+    if args.output_document and len(args.url) > 1:
+        logging.warning("Ignoring --output-document option for multiple file download")
+        args.output_document = None
 
     gdrive = GDriveDL(quiet=args.quiet, overwrite=args.output_document is not None)
-    gdrive.process_url(url, directory=args.directory_prefix, filename=args.output_document)
+    for url in args.url:
+        gdrive.process_url(url, directory=args.directory_prefix, filename=args.output_document)
 
 
 if __name__ == "__main__":

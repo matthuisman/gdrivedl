@@ -12,12 +12,12 @@ Google Drive Download Script
 ## Usage
 
 ```bash
-python gdrivedl.py <URL>
+python gdrivedl.py <URL> <URL> <URL>
 ```
 -   URL is a shared Google Drive URL
 
 ### Options
 - `-P` `--directory-prefix` Output directory (default is current directory)
 - `-O` `--output-document` Download to a particular filename (defaults to the
-  GDrive filename). Not valid when downloading folders.
+  GDrive filename). Only valid when downloading a single file.
 - `-q` `--quiet` Disable console output
