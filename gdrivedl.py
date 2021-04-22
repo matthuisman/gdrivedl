@@ -21,7 +21,7 @@ except ImportError:
 ITEM_URL = 'https://drive.google.com/open?id={id}'
 FILE_URL = 'https://docs.google.com/uc?export=download&id={id}&confirm={confirm}'
 FOLDER_URL = 'https://drive.google.com/embeddedfolderview?id={id}#list'
-CHUNKSIZE = 4096
+CHUNKSIZE = 16 * 1024
 USER_AGENT = 'Mozilla/5.0'
 
 ID_PATTERNS = [
