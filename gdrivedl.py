@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 from __future__ import unicode_literals
-import json
 import os
 import re
 import sys
@@ -12,16 +11,24 @@ from contextlib import contextmanager
 try:
     #Python3
     from urllib.request import Request, urlopen, build_opener, HTTPCookieProcessor
+    from html.parser import HTMLParser
     from http.cookiejar import CookieJar
 except ImportError:
     #Python2
+    from HTMLParser import HTMLParser
     from urllib2 import Request, urlopen, build_opener, HTTPCookieProcessor
     from cookielib import CookieJar
+
+try:
+    from html import unescape
+except ImportError:
+    html = HTMLParser()
+    unescape = html.unescape
 
 ITEM_URL = 'https://drive.google.com/open?id={id}'
 FILE_URL = 'https://docs.google.com/uc?export=download&id={id}&confirm={confirm}'
 FOLDER_URL = 'https://drive.google.com/embeddedfolderview?id={id}#list'
-CHUNKSIZE = 1024 * 1024 if os.name == 'nt' else 64 * 1024 #https://github.com/python/cpython/blob/master/Lib/shutil.py#L42
+CHUNKSIZE = 64 * 1024
 USER_AGENT = 'Mozilla/5.0'
 
 ID_PATTERNS = [
@@ -53,9 +60,11 @@ def sanitize(filename):
         "LPT6", "LPT7", "LPT8", "LPT9",
     ]
 
+    filename = unescape(filename)
+    filename = unicodedata.normalize("NFKD", filename)
+
     filename = "".join(c for c in filename if c not in blacklist)
     filename = "".join(c for c in filename if 31 < ord(c))
-    filename = unicodedata.normalize("NFKD", filename)
     filename = filename.rstrip(". ")
     filename = filename.strip()
 
