@@ -60,7 +60,7 @@ def sanitize(filename):
         "LPT6", "LPT7", "LPT8", "LPT9",
     ]
 
-    filename = unescape(filename)
+    filename = unescape(filename).encode('utf8').decode('utf8')
     filename = unicodedata.normalize("NFKD", filename)
 
     filename = "".join(c for c in filename if c not in blacklist)
