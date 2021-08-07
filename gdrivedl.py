@@ -181,8 +181,17 @@ class GDriveDL(object):
                 confirm = CONFIRM_PATTERN.search(cookies)
                 return self.process_file(id, directory, filename=filename, confirm=confirm.group(1))
 
+            content_disposition = resp.headers.get('content-disposition')
+            if not content_disposition:
+                page = resp.read(CHUNKSIZE)
+                if b'Google Drive - Quota exceeded' in page:
+                    logging.error('Quota exceeded for this file')
+                else:
+                    logging.error('content-disposition not found')
+                sys.exit(1)
+
             if not file_path:
-                filename = FILENAME_PATTERN.search(resp.headers.get('content-disposition')).group(1)
+                filename = FILENAME_PATTERN.search(content_disposition).group(1)
                 file_path = os.path.join(directory, sanitize(filename))
                 if not self._overwrite and os.path.exists(file_path):
                     logging.info('{file_path} [Exists]'.format(file_path=file_path))
