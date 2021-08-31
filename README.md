@@ -3,6 +3,7 @@
 Google Drive Download Script
 
 -   Python 2 / 3 Compatible
+-   No API keys / credentials required
 -   Supports all operating systems
 -   No external dependencies
 -   Works with shared files or folders
