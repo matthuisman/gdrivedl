@@ -13,9 +13,12 @@ Google Drive Download Script
 ## Usage
 
 ```bash
-python gdrivedl.py <URL> <URL> <URL>
+python gdrivedl.py <URL>
 ```
 -   URL is a shared Google Drive URL
+
+Multiple urls can be used by seperating them with a space. eg. ```python gdrivedl.py <URL1> <URL2> <URL3>```<br>
+On some systems you may need to enclose the url within quotes. eg ```python gdrivedl.py "<URL>"```
 
 ### Options
 - `-P` `--directory-prefix` Output directory (default is current directory)
