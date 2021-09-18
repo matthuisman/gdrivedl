@@ -7,6 +7,7 @@ import unicodedata
 import argparse
 import logging
 from contextlib import contextmanager
+from datetime import datetime
 
 try:
     #Python3
@@ -37,7 +38,7 @@ ID_PATTERNS = [
     re.compile('id=([0-9A-Za-z_-]{10,})(?:&|$)', re.IGNORECASE),
     re.compile('([0-9A-Za-z_-]{10,})', re.IGNORECASE)
 ]
-FOLDER_PATTERN = re.compile('<a href="(https://drive.google.com/.*?)".*?<div class="flip-entry-title">(.*?)</div>',
+FOLDER_PATTERN = re.compile('<a href="(https://drive.google.com/.*?)".*?<div class="flip-entry-title">(.*?)</div>.*?<div class="flip-entry-last-modified"><div>(.*?)</div>',
                             re.DOTALL | re.IGNORECASE)
 CONFIRM_PATTERN = re.compile("download_warning[0-9A-Za-z_-]+=([0-9A-Za-z_-]+);",
                              re.IGNORECASE)
@@ -104,9 +105,10 @@ def url_to_id(url):
     sys.exit(1)
 
 class GDriveDL(object):
-    def __init__(self, quiet=False, overwrite=False):
+    def __init__(self, quiet=False, overwrite=False, mtimes=False):
         self._quiet = quiet
         self._overwrite = overwrite
+        self._mtimes = mtimes
         self._create_empty_dirs = True
         self._opener = build_opener(HTTPCookieProcessor(CookieJar()))
 
@@ -150,11 +152,11 @@ class GDriveDL(object):
             sys.exit(1)
 
         for match in matches:
-            url, item_name = match
+            url, item_name, modified = match
             id = url_to_id(url)
 
             if '/file/' in url.lower():
-                self.process_file(id, directory, filename=sanitize(item_name))
+                self.process_file(id, directory, filename=sanitize(item_name), modified=modified)
             elif '/folders/' in url.lower():
                 self.process_folder(id, os.path.join(directory, sanitize(item_name)))
 
@@ -162,12 +164,62 @@ class GDriveDL(object):
             os.makedirs(directory)
             logging.info('Directory: {directory} [Created]'.format(directory=directory))
 
-    def process_file(self, id, directory, filename=None, confirm=''):
+    def _get_modified(self, modified):
+        if not modified or not self._mtimes:
+            return None
+
+        try:
+            if 'am' in modified or 'pm' in modified:
+                now = datetime.now()
+                hour, minute = modified.split(':')
+                if 'pm' in minute:
+                    hour = int(hour)+12
+                minute = minute.split(' ')[0]
+                modified = now.replace(hour=int(hour), minute=int(minute), second=0, microsecond=0)
+            elif ':' in modified:
+                now = datetime.now()
+                hour, minute = modified.split(':')
+                modified = now.replace(hour=int(hour), minute=int(minute), second=0, microsecond=0)
+            elif '/' in modified:
+                modified = datetime.strptime(modified, '%d/%m/%Y')
+            else:
+                now = datetime.now()
+                modified = datetime.strptime(modified, '%d %b')
+                modified = modified.replace(year=now.year)
+        except:
+            logging.debug('Failed to convert mtime: {}'.format(modified))
+            return None
+
+        return int((modified - datetime(1970, 1, 1)).total_seconds())
+
+    def _set_modified(self, file_path, timestamp):
+        if not timestamp:
+            return
+
+        try:
+            os.utime(file_path, (timestamp, timestamp))
+        except:
+            logging.debug('Failed to set mtime')
+
+    def _exists(self, file_path, modified):
+        if self._overwrite or not os.path.exists(file_path):
+            return False
+
+        if modified:
+            try:
+                return int(os.path.getmtime(file_path)) == modified
+            except:
+                logging.debug('Failed to get mtime')
+
+        return True
+
+    def process_file(self, id, directory, filename=None, modified=None, confirm=''):
         file_path = None
+        modified = self._get_modified(modified)
 
         if filename:
             file_path = filename if os.path.isabs(filename) else os.path.join(directory, filename)
-            if not self._overwrite and os.path.exists(file_path):
+            if self._exists(file_path, modified):
                 logging.info('{file_path} [Exists]'.format(file_path=file_path))
                 return
 
@@ -193,7 +245,7 @@ class GDriveDL(object):
             if not file_path:
                 filename = FILENAME_PATTERN.search(content_disposition).group(1)
                 file_path = os.path.join(directory, sanitize(filename))
-                if not self._overwrite and os.path.exists(file_path):
+                if self._exists(file_path, modified):
                     logging.info('{file_path} [Exists]'.format(file_path=file_path))
                     return
 
@@ -228,6 +280,8 @@ class GDriveDL(object):
                 if os.path.exists(file_path):
                     os.remove(file_path)
                 raise
+            else:
+                self._set_modified(file_path, modified)
 
         if not self._quiet:
             output('\n')
@@ -239,6 +293,7 @@ def main(args=None):
     parser.add_argument("-P", "--directory-prefix", default='.', help="Output directory (default is current directory)")
     parser.add_argument("-O", "--output-document", help="Output filename. Defaults to the GDrive filename. Only valid when downloading a single file.")
     parser.add_argument("-q", "--quiet", help="Disable console output", default=False, action="store_true")
+    parser.add_argument("-m", "--mtimes", help="Try use modified times to check for changed files", default=False, action="store_true")
     args = parser.parse_args(args)
 
     if args.quiet:
@@ -250,7 +305,7 @@ def main(args=None):
         logging.warning("Ignoring --output-document option for multiple url download")
         args.output_document = None
 
-    gdrive = GDriveDL(quiet=args.quiet, overwrite=args.output_document is not None)
+    gdrive = GDriveDL(quiet=args.quiet, overwrite=args.output_document is not None, mtimes=args.mtimes)
     for url in args.url:
         gdrive.process_url(url, directory=args.directory_prefix, filename=args.output_document)
 
