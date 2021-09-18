@@ -6,6 +6,7 @@ import sys
 import unicodedata
 import argparse
 import logging
+import traceback
 from contextlib import contextmanager
 from datetime import datetime
 
@@ -196,26 +197,20 @@ class GDriveDL(object):
             return None
 
         try:
-            if "am" in modified or "pm" in modified:
+            if ":" in modified:
                 now = datetime.now()
-                hour, minute = modified.split(":")
+                hour, minute = modified.lower().split(":")
                 if "pm" in minute:
                     hour = int(hour) + 12
                 minute = minute.split(" ")[0]
                 modified = now.replace(
                     hour=int(hour), minute=int(minute), second=0, microsecond=0
                 )
-            elif ":" in modified:
-                now = datetime.now()
-                hour, minute = modified.split(":")
-                modified = now.replace(
-                    hour=int(hour), minute=int(minute), second=0, microsecond=0
-                )
             elif "/" in modified:
-                modified = datetime.strptime(modified, "%d/%m/%Y")
+                modified = datetime.strptime(modified, "%m/%d/%y")
             else:
                 now = datetime.now()
-                modified = datetime.strptime(modified, "%d %b")
+                modified = datetime.strptime(modified, "%b %d")
                 modified = modified.replace(year=now.year)
         except:
             logging.debug("Failed to convert mtime: {}".format(modified))
