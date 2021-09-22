@@ -6,19 +6,18 @@ import sys
 import unicodedata
 import argparse
 import logging
-import traceback
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 
 try:
     # Python3
-    from urllib.request import Request, urlopen, build_opener, HTTPCookieProcessor
+    from urllib.request import Request, build_opener, HTTPCookieProcessor
     from html.parser import HTMLParser
     from http.cookiejar import CookieJar
 except ImportError:
     # Python2
     from HTMLParser import HTMLParser
-    from urllib2 import Request, urlopen, build_opener, HTTPCookieProcessor
+    from urllib2 import Request, build_opener, HTTPCookieProcessor
     from cookielib import CookieJar
 
 try:
@@ -198,18 +197,17 @@ class GDriveDL(object):
 
         try:
             if ":" in modified:
-                now = datetime.now()
                 hour, minute = modified.lower().split(":")
                 if "pm" in minute:
                     hour = int(hour) + 12
+                hour = int(hour)+7  # modified is UTC-7 so +7 to utc time
                 minute = minute.split(" ")[0]
-                modified = now.replace(
-                    hour=int(hour), minute=int(minute), second=0, microsecond=0
-                )
+                now = datetime.utcnow().replace(hour=0, minute=int(minute), second=0, microsecond=0)
+                modified = now + timedelta(hours=hour)
             elif "/" in modified:
                 modified = datetime.strptime(modified, "%m/%d/%y")
             else:
-                now = datetime.now()
+                now = datetime.utcnow()
                 modified = datetime.strptime(modified, "%b %d")
                 modified = modified.replace(year=now.year)
         except:
@@ -241,7 +239,7 @@ class GDriveDL(object):
 
     def process_file(self, id, directory, filename=None, modified=None, confirm=""):
         file_path = None
-        modified = self._get_modified(modified)
+        modified_ts = self._get_modified(modified)
 
         if filename:
             file_path = (
@@ -249,7 +247,7 @@ class GDriveDL(object):
                 if os.path.isabs(filename)
                 else os.path.join(directory, filename)
             )
-            if self._exists(file_path, modified):
+            if self._exists(file_path, modified_ts):
                 logging.info("{file_path} [Exists]".format(file_path=file_path))
                 return
 
@@ -262,7 +260,7 @@ class GDriveDL(object):
             if not confirm and "download_warning" in cookies:
                 confirm = CONFIRM_PATTERN.search(cookies)
                 return self.process_file(
-                    id, directory, filename=filename, confirm=confirm.group(1)
+                    id, directory, filename=filename, modified=modified, confirm=confirm.group(1)
                 )
 
             content_disposition = resp.headers.get("content-disposition")
@@ -277,7 +275,7 @@ class GDriveDL(object):
             if not file_path:
                 filename = FILENAME_PATTERN.search(content_disposition).group(1)
                 file_path = os.path.join(directory, sanitize(filename))
-                if self._exists(file_path, modified):
+                if self._exists(file_path, modified_ts):
                     logging.info("{file_path} [Exists]".format(file_path=file_path))
                     return
 
@@ -322,7 +320,7 @@ class GDriveDL(object):
                     os.remove(file_path)
                 raise
             else:
-                self._set_modified(file_path, modified)
+                self._set_modified(file_path, modified_ts)
 
         if not self._quiet:
             output("\n")
@@ -376,7 +374,6 @@ def main(args=None):
         gdrive.process_url(
             url, directory=args.directory_prefix, filename=args.output_document
         )
-
 
 if __name__ == "__main__":
     main()
