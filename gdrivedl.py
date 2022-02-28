@@ -237,7 +237,7 @@ class GDriveDL(object):
 
         return True
 
-    def process_file(self, id, directory, filename=None, modified=None, confirm=""):
+    def process_file(self, id, directory, filename=None, modified=None, confirm="t"):
         file_path = None
         modified_ts = self._get_modified(modified)
 
