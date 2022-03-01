@@ -43,7 +43,7 @@ FOLDER_PATTERN = re.compile(
     re.DOTALL | re.IGNORECASE,
 )
 CONFIRM_PATTERN = re.compile(
-    "download_warning[0-9A-Za-z_-]+=([0-9A-Za-z_-]+);", re.IGNORECASE
+    b"confirm=([0-9A-Za-z_-]+)", re.IGNORECASE
 )
 FILENAME_PATTERN = re.compile('attachment;filename="(.*?)"', re.IGNORECASE)
 
@@ -237,7 +237,7 @@ class GDriveDL(object):
 
         return True
 
-    def process_file(self, id, directory, filename=None, modified=None, confirm="t"):
+    def process_file(self, id, directory, filename=None, modified=None, confirm=""):
         file_path = None
         modified_ts = self._get_modified(modified)
 
@@ -256,17 +256,15 @@ class GDriveDL(object):
                 logging.error("File: {} does not have link sharing enabled".format(id))
                 sys.exit(1)
 
-            cookies = resp.headers.get("Set-Cookie") or ""
-            if not confirm and "download_warning" in cookies:
-                confirm = CONFIRM_PATTERN.search(cookies)
-                return self.process_file(
-                    id, directory, filename=filename, modified=modified, confirm=confirm.group(1)
-                )
-
             content_disposition = resp.headers.get("content-disposition")
             if not content_disposition:
                 page = resp.read(CHUNKSIZE)
-                if b"Google Drive - Quota exceeded" in page:
+                confirm = CONFIRM_PATTERN.search(page)
+                if confirm:
+                    return self.process_file(
+                        id, directory, filename=filename, modified=modified, confirm=confirm.group(1)
+                    )
+                elif b"Google Drive - Quota exceeded" in page:
                     logging.error("Quota exceeded for this file")
                 else:
                     logging.error("content-disposition not found")
