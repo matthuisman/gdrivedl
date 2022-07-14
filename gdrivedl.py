@@ -259,7 +259,7 @@ class GDriveDL(object):
             content_disposition = resp.headers.get("content-disposition")
             if not content_disposition:
                 if confirm:
-                    logging.error("unable to confirm and download file")
+                    logging.error("content-disposition not found and confirm={} did not work".format(confirm))
                     sys.exit(1)
 
                 page = resp.read(CHUNKSIZE)
@@ -268,15 +268,13 @@ class GDriveDL(object):
                     return self.process_file(
                         id, directory, filename=filename, modified=modified, confirm=confirm.group(1)
                     )
-                elif b"Virus scan warning" in page:
-                    return self.process_file(
-                        id, directory, filename=filename, modified=modified, confirm='t'
-                    )
                 elif b"Google Drive - Quota exceeded" in page:
                     logging.error("Quota exceeded for this file")
                 else:
-                    logging.error("content-disposition not found")
-                sys.exit(1)
+                    # Try confirm=t
+                    return self.process_file(
+                        id, directory, filename=filename, modified=modified, confirm='t'
+                    )
 
             if not file_path:
                 filename = FILENAME_PATTERN.search(content_disposition).group(1)
