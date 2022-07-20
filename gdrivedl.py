@@ -360,12 +360,23 @@ def main(args=None):
         default=False,
         action="store_true",
     )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        help="Debug level logging",
+        default=False,
+        action="store_true",
+    )
     args = parser.parse_args(args)
 
-    if args.quiet:
-        logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARN)
+    if args.debug:
+        level = logging.DEBUG
+    elif args.quiet:
+        level = logging.WARN
     else:
-        logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
+        level = logging.INFO
+
+    logging.basicConfig(format="%(levelname)s: %(message)s", level=level)
 
     if args.output_document and len(args.url) > 1:
         logging.warning("Ignoring --output-document option for multiple url download")
