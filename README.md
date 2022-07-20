@@ -25,4 +25,5 @@ On some systems you may need to enclose the url within quotes. eg ```python gdri
 - `-O` `--output-document` Download to a particular filename (defaults to the
   GDrive filename). Only valid when downloading a single file.
 - `-q` `--quiet` Disable console output
+- `-d` `--debug` Show more vebose debug console output
 - `-m` `--mtimes` Try use modified times to check for changed files
