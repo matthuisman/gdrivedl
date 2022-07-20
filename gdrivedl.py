@@ -136,6 +136,7 @@ class GDriveDL(object):
         self._mtimes = mtimes
         self._create_empty_dirs = True
         self._opener = build_opener(HTTPCookieProcessor(CookieJar()))
+        self._processed = []
 
     @contextmanager
     def _request(self, url):
@@ -167,6 +168,11 @@ class GDriveDL(object):
             sys.exit(1)
 
     def process_folder(self, id, directory):
+        if id in self._processed:
+            logging.debug('Skipping already processed folder: {}'.format(id))
+            return
+
+        self._processed.append(id)
         with self._request(FOLDER_URL.format(id=id)) as resp:
             html = resp.read().decode("utf-8")
 
