@@ -45,7 +45,7 @@ FOLDER_PATTERN = re.compile(
 CONFIRM_PATTERN = re.compile(
     b"confirm=([0-9A-Za-z_-]+)", re.IGNORECASE
 )
-FILENAME_PATTERN = re.compile('attachment;filename="(.*?)"', re.IGNORECASE)
+FILENAME_PATTERN = re.compile('filename="(.*?)"', re.IGNORECASE)
 
 
 def output(text):
