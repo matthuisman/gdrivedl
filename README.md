@@ -27,3 +27,4 @@ On some systems you may need to enclose the url within quotes. eg ```python gdri
 - `-q` `--quiet` Disable console output
 - `-d` `--debug` Show more vebose debug console output
 - `-m` `--mtimes` Try use modified times to check for changed files
+- `-f` `--urlfile` Text file containing Google Drive URLS to download (one per line)

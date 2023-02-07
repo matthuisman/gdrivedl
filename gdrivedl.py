@@ -373,6 +373,11 @@ def main(args=None):
         default=False,
         action="store_true",
     )
+    parser.add_argument(
+        "-f",
+        "--urlfile",
+        help="Text file containing Google Drive URLS to download (one per line)",
+    )
     args = parser.parse_args(args)
 
     if args.debug:
@@ -391,6 +396,15 @@ def main(args=None):
     gdrive = GDriveDL(
         quiet=args.quiet, overwrite=args.output_document is not None, mtimes=args.mtimes
     )
+
+    if args.urlfile:
+        with open(args.urlfile, 'r') as f:
+            args.url.extend(f.readlines())
+
+    args.url = [x.strip() for x in args.url if x.strip()]
+    if len(args.url) > 1:
+        logging.info('Processing {} urls'.format(len(args.url)))
+
     for url in args.url:
         gdrive.process_url(
             url, directory=args.directory_prefix, filename=args.output_document
