@@ -8,6 +8,8 @@ import argparse
 import logging
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
+
 
 try:
     # Python3
@@ -182,16 +184,25 @@ class GDriveDL(object):
             logging.error("Folder: {} does not have link sharing enabled".format(id))
             sys.exit(1)
 
-        for match in matches:
-            url, item_name, modified = match
-            id = url_to_id(url)
+        with ThreadPoolExecutor() as executor:
+            for match in matches:
+                url, item_name, modified = match
+                id = url_to_id(url)
 
-            if "/file/" in url.lower():
-                self.process_file(
-                    id, directory, filename=sanitize(item_name), modified=modified
-                )
-            elif "/folders/" in url.lower():
-                self.process_folder(id, os.path.join(directory, sanitize(item_name)))
+                if "/file/" in url.lower():
+                    executor.submit(
+                        self.process_file,
+                        id,
+                        directory,
+                        filename=sanitize(item_name),
+                        modified=modified
+                    )
+                elif "/folders/" in url.lower():
+                    executor.submit(
+                        self.process_folder,
+                        id,
+                        os.path.join(directory, sanitize(item_name))
+                    )
 
         if self._create_empty_dirs and not os.path.exists(directory):
             os.makedirs(directory)
