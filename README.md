@@ -1,4 +1,4 @@
-# GDriveDL
+# GDriveDL-Parellel
 
 Google Drive Download Script
 
@@ -9,6 +9,7 @@ Google Drive Download Script
 -   Works with shared files or folders
 -   Works with large files
 -   Files / folders must have been shared via link
+-   Processes downloads concurrently 
 
 ## Usage
 
