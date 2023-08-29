@@ -11,7 +11,7 @@ Google Drive Download Script
 -   Processes downloads concurrently 
 
 ## Install
-This package is available on [PyPi](https://pypi.org/project/gdrivedl-parallel/). 
+This package is available on [PyPi](https://pypi.org/project/gdrivedl-parallel/). <br>
 ```pip install gdrivedl-parallel```
 
 ## Usage
