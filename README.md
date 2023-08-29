@@ -2,7 +2,6 @@
 
 Google Drive Download Script
 
--   Python 2 / 3 compatible
 -   No API keys / credentials required
 -   Supports all operating systems
 -   No external dependencies
@@ -14,12 +13,12 @@ Google Drive Download Script
 ## Usage
 
 ```bash
-python gdrivedl.py <URL>
+python gdrivedl-parallel.py <URL>
 ```
 -   URL is a shared Google Drive URL
 
-Multiple urls can be used by seperating them with a space. eg. ```python gdrivedl.py <URL1> <URL2> <URL3>```<br>
-On some systems you may need to enclose the url within quotes. eg ```python gdrivedl.py "<URL>"```
+Multiple urls can be used by seperating them with a space. eg. ```python gdrivedl-parallel.py <URL1> <URL2> <URL3>```<br>
+On some systems you may need to enclose the url within quotes. eg ```python gdrivedl-parallel.py "<URL>"```
 
 ### Options
 - `-P` `--directory-prefix` Output directory (default is current directory)
