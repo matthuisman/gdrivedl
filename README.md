@@ -10,6 +10,10 @@ Google Drive Download Script
 -   Files / folders must have been shared via link
 -   Processes downloads concurrently 
 
+## Install
+This package is available on [PyPi](https://pypi.org/project/gdrivedl-parallel/). 
+```pip install gdrivedl-parallel```
+
 ## Usage
 
 ```bash
