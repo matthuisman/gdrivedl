@@ -27,7 +27,12 @@ except ImportError:
     unescape = html.unescape
 
 ITEM_URL = "https://drive.google.com/open?id={id}"
-FILE_URL = "https://docs.google.com/uc?export=download&id={id}&confirm={confirm}"
+# WARNING: As of 2024-01-12, the confirmation logic doesn't actually require a value for confirm,
+# and a URL of this form will work:
+#   ../download?uc-download-link=Download%20anyway&id={id}&confirm=
+# But we should assume that's a bug and not trust that, because if we supply a confirm value, the 
+# logic will also require the new uuid value
+FILE_URL = "https://drive.usercontent.google.com/download?uc-download-link=Download%20anyway&id={id}&confirm={confirm}&uuid={uuid}"
 FOLDER_URL = "https://drive.google.com/embeddedfolderview?id={id}#list"
 CHUNKSIZE = 64 * 1024
 USER_AGENT = "Mozilla/5.0"
@@ -42,9 +47,12 @@ FOLDER_PATTERN = re.compile(
     '<a href="(https://drive.google.com/.*?)".*?<div class="flip-entry-title">(.*?)</div>.*?<div class="flip-entry-last-modified"><div>(.*?)</div>',
     re.DOTALL | re.IGNORECASE,
 )
-CONFIRM_PATTERN = re.compile(
-    b"confirm=([0-9A-Za-z_-]+)", re.IGNORECASE
-)
+CONFIRM_PATTERNS = [
+    re.compile(r"confirm=([0-9A-Za-z_-]+)", re.IGNORECASE),
+    re.compile(r"name=\"confirm\"\s+value=\"([0-9A-Za-z_-]+)\"", re.IGNORECASE),
+]
+UUID_PATTERN = re.compile(r"name=\"uuid\"\s+value=\"([0-9A-Za-z_-]+)\"", re.IGNORECASE)
+
 FILENAME_PATTERN = re.compile('filename="(.*?)"', re.IGNORECASE)
 
 
@@ -149,7 +157,7 @@ class GDriveDL(object):
         finally:
             f.close()
 
-    def process_url(self, url, directory, filename=None):
+    def process_url(self, url, directory, verbose, filename=None):
         id = url_to_id(url)
         url = url.lower()
 
@@ -158,16 +166,16 @@ class GDriveDL(object):
                 url = resp.geturl()
 
         if "/file/" in url or "/uc?" in url:
-            self.process_file(id, directory, filename=filename)
+            self.process_file(id, directory, verbose, filename=filename)
         elif "/folders/" in url:
             if filename:
                 logging.warning("Ignoring --output-document option for folder download")
-            self.process_folder(id, directory)
+            self.process_folder(id, directory, verbose)
         else:
             logging.error("That id {} returned an unknown url {}".format(id, url))
             sys.exit(1)
 
-    def process_folder(self, id, directory):
+    def process_folder(self, id, directory, verbose):
         if id in self._processed:
             logging.debug('Skipping already processed folder: {}'.format(id))
             return
@@ -175,6 +183,9 @@ class GDriveDL(object):
         self._processed.append(id)
         with self._request(FOLDER_URL.format(id=id)) as resp:
             html = resp.read().decode("utf-8")
+
+        if verbose:
+            logging.debug("HTML page contents:\n\n{}\n\n".format(html))
 
         matches = re.findall(FOLDER_PATTERN, html)
 
@@ -243,7 +254,7 @@ class GDriveDL(object):
 
         return True
 
-    def process_file(self, id, directory, filename=None, modified=None, confirm=""):
+    def process_file(self, id, directory, verbose, filename=None, modified=None, confirm="", uuid=""):
         file_path = None
         modified_ts = self._get_modified(modified)
 
@@ -257,29 +268,47 @@ class GDriveDL(object):
                 logging.info("{file_path} [Exists]".format(file_path=file_path))
                 return
 
-        with self._request(FILE_URL.format(id=id, confirm=confirm)) as resp:
+        with self._request(FILE_URL.format(id=id, confirm=confirm, uuid=uuid)) as resp:
             if "ServiceLogin" in resp.url:
                 logging.error("File: {} does not have link sharing enabled".format(id))
                 sys.exit(1)
 
+            if verbose:
+                headers = "\n".join(["{}: {}".format(h, resp.headers.get(h)) for h in resp.headers])
+                logging.debug("HTTP header contents:\n\n{}\n\n".format(headers))
+
             content_disposition = resp.headers.get("content-disposition")
             if not content_disposition:
                 if confirm:
+                    # The content-disposition header is an indication that the download confirmation worked
                     logging.error("content-disposition not found and confirm={} did not work".format(confirm))
                     sys.exit(1)
+                try:
+                    html = resp.read(CHUNKSIZE).decode("utf-8")
+                    if verbose:
+                        logging.debug("HTML page contents:\n\n{}\n\n".format(html))
+                except:
+                    logging.error("Response wasn't decodable as utf-8")
 
-                page = resp.read(CHUNKSIZE)
-                confirm = CONFIRM_PATTERN.search(page)
+                for pattern in CONFIRM_PATTERNS:
+                    confirm = pattern.search(html)
+                    if confirm: break
+                uuid = UUID_PATTERN.search(html)
+                if uuid:
+                    uuid = uuid.group(1)
+                else:
+                    uuid=''
                 if confirm:
+                    logging.debug("Found confirmation '{}', trying it".format(confirm))
                     return self.process_file(
-                        id, directory, filename=filename, modified=modified, confirm=confirm.group(1)
+                        id, directory, verbose, filename=filename, modified=modified, confirm=confirm.group(1), uuid=uuid
                     )
-                elif b"Google Drive - Quota exceeded" in page:
+                elif b"Google Drive - Quota exceeded" in html:
                     logging.error("Quota exceeded for this file")
                 else:
-                    # Try confirm=t
+                    logging.debug("Trying confirmation 't' as a last resort")
                     return self.process_file(
-                        id, directory, filename=filename, modified=modified, confirm='t'
+                        id, directory, verbose, filename=filename, modified=modified, confirm='t', uuid=uuid
                     )
 
             if not file_path:
@@ -374,11 +403,20 @@ def main(args=None):
         action="store_true",
     )
     parser.add_argument(
+        "--verbose",
+        help="Debug level logging and also print HTML contents and HTTP headers",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(
         "-f",
         "--urlfile",
         help="Text file containing Google Drive URLS to download (one per line)",
     )
     args = parser.parse_args(args)
+
+    if args.verbose:
+        args.debug = True
 
     if args.debug:
         level = logging.DEBUG
@@ -407,7 +445,7 @@ def main(args=None):
 
     for url in args.url:
         gdrive.process_url(
-            url, directory=args.directory_prefix, filename=args.output_document
+            url, directory=args.directory_prefix, verbose=args.verbose, filename=args.output_document
         )
 
 if __name__ == "__main__":
