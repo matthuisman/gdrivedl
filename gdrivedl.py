@@ -199,10 +199,10 @@ class GDriveDL(object):
 
             if "/file/" in url.lower():
                 self.process_file(
-                    id, directory, filename=sanitize(item_name), modified=modified
+                    id, directory, verbose, filename=sanitize(item_name), modified=modified
                 )
             elif "/folders/" in url.lower():
-                self.process_folder(id, os.path.join(directory, sanitize(item_name)))
+                self.process_folder(id, os.path.join(directory, sanitize(item_name)), verbose)
 
         if self._create_empty_dirs and not os.path.exists(directory):
             os.makedirs(directory)
