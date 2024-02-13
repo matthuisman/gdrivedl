@@ -288,7 +288,7 @@ class GDriveDL(object):
 
             if verbose:
                 headers = "\n".join(["{}: {}".format(h, resp.headers.get(h)) for h in resp.headers])
-                logging.debug("HTTP header contents:\n\n{}\n\n".format(headers))
+                logging.debug("Headers:\n{}".format(headers))
 
             content_disposition = resp.headers.get("content-disposition")
             if not content_disposition:
@@ -299,7 +299,7 @@ class GDriveDL(object):
 
                 html = resp.read(CHUNKSIZE)
                 if verbose:
-                    logging.debug("HTML page contents\n{}".format(html))
+                    logging.debug("HTML:\n{}".format(html))
 
                 if b"Google Drive - Quota exceeded" in html:
                     self._error("{}: Quota exceeded for this file".format(id))
