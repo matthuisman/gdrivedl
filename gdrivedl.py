@@ -48,10 +48,10 @@ FOLDER_PATTERN = re.compile(
     re.DOTALL | re.IGNORECASE,
 )
 CONFIRM_PATTERNS = [
-    re.compile(r"confirm=([0-9A-Za-z_-]+)", re.IGNORECASE),
-    re.compile(r"name=\"confirm\"\s+value=\"([0-9A-Za-z_-]+)\"", re.IGNORECASE),
+    re.compile(b"confirm=([0-9A-Za-z_-]+)", re.IGNORECASE),
+    re.compile(b"name=\"confirm\"\s+value=\"([0-9A-Za-z_-]+)\"", re.IGNORECASE),
 ]
-UUID_PATTERN = re.compile(r"name=\"uuid\"\s+value=\"([0-9A-Za-z_-]+)\"", re.IGNORECASE)
+UUID_PATTERN = re.compile(b"name=\"uuid\"\s+value=\"([0-9A-Za-z_-]+)\"", re.IGNORECASE)
 
 FILENAME_PATTERN = re.compile('filename="(.*?)"', re.IGNORECASE)
 
@@ -133,9 +133,6 @@ def url_to_id(url):
         if match:
             return match.group(1)
 
-    logging.error("Unable to get ID from {}".format(url))
-    sys.exit(1)
-
 
 class GDriveDL(object):
     def __init__(self, quiet=False, overwrite=False, mtimes=False):
@@ -145,6 +142,15 @@ class GDriveDL(object):
         self._create_empty_dirs = True
         self._opener = build_opener(HTTPCookieProcessor(CookieJar()))
         self._processed = []
+        self._errors = []
+
+    def _error(self, message):
+        logging.error(message)
+        self._errors.append(message)
+
+    @property
+    def errors(self):
+        return self._errors
 
     @contextmanager
     def _request(self, url):
@@ -159,6 +165,10 @@ class GDriveDL(object):
 
     def process_url(self, url, directory, verbose, filename=None):
         id = url_to_id(url)
+        if not id:
+            self._error("{}: Unable to find ID from url".format(url))
+            return
+
         url = url.lower()
 
         if "://" not in url:
@@ -172,8 +182,7 @@ class GDriveDL(object):
                 logging.warning("Ignoring --output-document option for folder download")
             self.process_folder(id, directory, verbose)
         else:
-            logging.error("That id {} returned an unknown url {}".format(id, url))
-            sys.exit(1)
+            self._error("{}: returned an unknown url {}".format(id, url))
 
     def process_folder(self, id, directory, verbose):
         if id in self._processed:
@@ -190,12 +199,15 @@ class GDriveDL(object):
         matches = re.findall(FOLDER_PATTERN, html)
 
         if not matches and "ServiceLogin" in html:
-            logging.error("Folder: {} does not have link sharing enabled".format(id))
-            sys.exit(1)
+            self._error("{}: does not have link sharing enabled".format(id))
+            return
 
         for match in matches:
             url, item_name, modified = match
             id = url_to_id(url)
+            if not id:
+                self._error("{}: Unable to find ID from url".format(url))
+                continue
 
             if "/file/" in url.lower():
                 self.process_file(
@@ -270,8 +282,8 @@ class GDriveDL(object):
 
         with self._request(FILE_URL.format(id=id, confirm=confirm, uuid=uuid)) as resp:
             if "ServiceLogin" in resp.url:
-                logging.error("File: {} does not have link sharing enabled".format(id))
-                sys.exit(1)
+                self._error("{}: does not have link sharing enabled".format(id))
+                return
 
             if verbose:
                 headers = "\n".join(["{}: {}".format(h, resp.headers.get(h)) for h in resp.headers])
@@ -281,30 +293,30 @@ class GDriveDL(object):
             if not content_disposition:
                 if confirm:
                     # The content-disposition header is an indication that the download confirmation worked
-                    logging.error("content-disposition not found and confirm={} did not work".format(confirm))
-                    sys.exit(1)
-                try:
-                    html = resp.read(CHUNKSIZE).decode("utf-8")
-                    if verbose:
-                        logging.debug("HTML page contents:\n\n{}\n\n".format(html))
-                except:
-                    logging.error("Response wasn't decodable as utf-8")
+                    self._error("{}: content-disposition not found and confirm={} did not work".format(id, confirm))
+                    return
+
+                html = resp.read(CHUNKSIZE)
+                if verbose:
+                    logging.debug("HTML page contents\n{}".format(html))
+
+                if b"Google Drive - Quota exceeded" in html:
+                    self._error("{}: Quota exceeded for this file".format(id))
+                    return
 
                 for pattern in CONFIRM_PATTERNS:
                     confirm = pattern.search(html)
-                    if confirm: break
+                    if confirm:
+                        break
+
                 uuid = UUID_PATTERN.search(html)
-                if uuid:
-                    uuid = uuid.group(1)
-                else:
-                    uuid=''
+                uuid = uuid.group(1) if uuid else ''
+
                 if confirm:
                     logging.debug("Found confirmation '{}', trying it".format(confirm))
                     return self.process_file(
                         id, directory, verbose, filename=filename, modified=modified, confirm=confirm.group(1), uuid=uuid
                     )
-                elif b"Google Drive - Quota exceeded" in html:
-                    logging.error("Quota exceeded for this file")
                 else:
                     logging.debug("Trying confirmation 't' as a last resort")
                     return self.process_file(
@@ -338,8 +350,8 @@ class GDriveDL(object):
                             b"Too many users have viewed or downloaded this file recently"
                             in chunk
                         ):
-                            logging.error("Quota exceeded for this file")
-                            sys.exit(1)
+                            self._error("{}: Quota exceeded for this file".format(id))
+                            return
 
                         dl += len(chunk)
                         f.write(chunk)
@@ -447,6 +459,9 @@ def main(args=None):
         gdrive.process_url(
             url, directory=args.directory_prefix, verbose=args.verbose, filename=args.output_document
         )
+
+    if gdrive.errors:
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
