@@ -19,7 +19,7 @@ python gdrivedl.py <URL>
 
 Multiple urls can be used by seperating them with a space. eg. ```python gdrivedl.py <URL1> <URL2> <URL3>```<br>
 On some systems you may need to enclose the url within quotes. eg ```python gdrivedl.py "<URL>"```
-The script will exit with code 1 if there were any errors
+<br>The script will exit with code 1 if there were any errors otherwise 0
 
 ### Options
 - `-P` `--directory-prefix` Output directory (default is current directory)
