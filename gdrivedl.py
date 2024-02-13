@@ -135,10 +135,11 @@ def url_to_id(url):
 
 
 class GDriveDL(object):
-    def __init__(self, quiet=False, overwrite=False, mtimes=False):
+    def __init__(self, quiet=False, overwrite=False, mtimes=False, continue_on_errors=False):
         self._quiet = quiet
         self._overwrite = overwrite
         self._mtimes = mtimes
+        self._continue_on_errors = continue_on_errors
         self._create_empty_dirs = True
         self._opener = build_opener(HTTPCookieProcessor(CookieJar()))
         self._processed = []
@@ -147,6 +148,8 @@ class GDriveDL(object):
     def _error(self, message):
         logging.error(message)
         self._errors.append(message)
+        if not self._continue_on_errors:
+            sys.exit(1)
 
     @property
     def errors(self):
@@ -416,8 +419,16 @@ def main(args=None):
         action="store_true",
     )
     parser.add_argument(
+        "-v",
         "--verbose",
         help="Debug level logging and also print HTML contents and HTTP headers",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(
+        "-e",
+        "--continue_on_errors",
+        help="If any errors processing files/folder then log and continue to next",
         default=False,
         action="store_true",
     )
@@ -445,7 +456,10 @@ def main(args=None):
         args.output_document = None
 
     gdrive = GDriveDL(
-        quiet=args.quiet, overwrite=args.output_document is not None, mtimes=args.mtimes
+        quiet = args.quiet,
+        overwrite = args.output_document is not None,
+        mtimes = args.mtimes,
+        continue_on_errors = args.continue_on_errors,
     )
 
     if args.urlfile:
