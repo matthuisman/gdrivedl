@@ -183,6 +183,7 @@ class GDriveDL(object):
             self.process_folder(id, directory, verbose)
         else:
             self._error("{}: returned an unknown url {}".format(id, url))
+            return
 
     def process_folder(self, id, directory, verbose):
         if id in self._processed:
