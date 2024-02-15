@@ -427,7 +427,7 @@ def main(args=None):
     )
     parser.add_argument(
         "-e",
-        "--continue_on_errors",
+        "--continue-on-errors",
         help="If any errors processing files/folder then log and continue to next",
         default=False,
         action="store_true",
