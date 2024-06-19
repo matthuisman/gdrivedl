@@ -27,15 +27,10 @@ except ImportError:
     unescape = html.unescape
 
 ITEM_URL = "https://drive.google.com/open?id={id}"
-# WARNING: As of 2024-01-12, the confirmation logic doesn't actually require a value for confirm,
-# and a URL of this form will work:
-#   ../download?uc-download-link=Download%20anyway&id={id}&confirm=
-# But we should assume that's a bug and not trust that, because if we supply a confirm value, the 
-# logic will also require the new uuid value
-FILE_URL = "https://drive.usercontent.google.com/download?uc-download-link=Download%20anyway&id={id}&confirm={confirm}&uuid={uuid}"
+FILE_URL = "https://drive.usercontent.google.com/download?id={id}&export=download&authuser=0"
 FOLDER_URL = "https://drive.google.com/embeddedfolderview?id={id}#list"
 CHUNKSIZE = 64 * 1024
-USER_AGENT = "Mozilla/5.0"
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
 
 ID_PATTERNS = [
     re.compile("/file/d/([0-9A-Za-z_-]{10,})(?:/|$)", re.IGNORECASE),
@@ -49,9 +44,9 @@ FOLDER_PATTERN = re.compile(
 )
 CONFIRM_PATTERNS = [
     re.compile(b"confirm=([0-9A-Za-z_-]+)", re.IGNORECASE),
-    re.compile(b"name=\"confirm\"\s+value=\"([0-9A-Za-z_-]+)\"", re.IGNORECASE),
+    re.compile(b"name=\"confirm\"\\s+value=\"([0-9A-Za-z_-]+)\"", re.IGNORECASE),
 ]
-UUID_PATTERN = re.compile(b"name=\"uuid\"\s+value=\"([0-9A-Za-z_-]+)\"", re.IGNORECASE)
+UUID_PATTERN = re.compile(b"name=\"uuid\"\\s+value=\"([0-9A-Za-z_-]+)\"", re.IGNORECASE)
 
 FILENAME_PATTERN = re.compile('filename="(.*?)"', re.IGNORECASE)
 
@@ -284,7 +279,14 @@ class GDriveDL(object):
                 logging.info("{file_path} [Exists]".format(file_path=file_path))
                 return
 
-        with self._request(FILE_URL.format(id=id, confirm=confirm, uuid=uuid)) as resp:
+        url = FILE_URL.format(id=id)
+        if confirm:
+            url += '&confirm={}'.format(confirm)
+        if uuid:
+            url += '&uuid={}'.format(uuid)
+
+        logging.debug("Requesting: {}".format(url))
+        with self._request(url) as resp:
             if "ServiceLogin" in resp.url:
                 self._error("{}: does not have link sharing enabled".format(id))
                 return
@@ -314,12 +316,13 @@ class GDriveDL(object):
                         break
 
                 uuid = UUID_PATTERN.search(html)
-                uuid = uuid.group(1) if uuid else ''
+                uuid = uuid.group(1).decode() if uuid else ''
 
                 if confirm:
+                    confirm = confirm.group(1).decode()
                     logging.debug("Found confirmation '{}', trying it".format(confirm))
                     return self.process_file(
-                        id, directory, verbose, filename=filename, modified=modified, confirm=confirm.group(1), uuid=uuid
+                        id, directory, verbose, filename=filename, modified=modified, confirm=confirm, uuid=uuid
                     )
                 else:
                     logging.debug("Trying confirmation 't' as a last resort")
