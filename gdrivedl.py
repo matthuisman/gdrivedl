@@ -8,6 +8,29 @@ import argparse
 import logging
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+import ssl
+import subprocess
+
+def install_certifi():
+    """Install certifi package and configure SSL certificates"""
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "certifi"])
+        import certifi
+        ssl._create_default_https_context = ssl._create_unverified_context
+        os.environ['SSL_CERT_FILE'] = certifi.where()
+        logging.info("Successfully installed certifi and configured SSL certificates")
+    except Exception as e:
+        logging.error(f"Failed to install certifi: {str(e)}")
+        sys.exit(1)
+
+try:
+    # Try importing certifi first
+    import certifi
+    ssl._create_default_https_context = ssl._create_unverified_context
+    os.environ['SSL_CERT_FILE'] = certifi.where()
+except ImportError:
+    # If certifi is not installed, install it
+    install_certifi()
 
 try:
     # Python3
@@ -155,7 +178,14 @@ class GDriveDL(object):
         logging.debug("Requesting: {}".format(url))
         req = Request(url, headers={"User-Agent": USER_AGENT})
 
-        f = self._opener.open(req)
+        try:
+            f = self._opener.open(req)
+        except ssl.SSLCertVerificationError:
+            logging.warning("SSL certificate verification failed. Attempting to install certifi...")
+            install_certifi()
+            # Retry the request after installing certifi
+            f = self._opener.open(req)
+        
         try:
             yield f
         finally:
